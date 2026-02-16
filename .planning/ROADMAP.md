@@ -36,11 +36,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Every content file uses YAML frontmatter with required fields (module, ecc_version, confidence, last_verified, ehp_range)
   3. Validation scripts can verify cross-references, frontmatter presence, and file size budgets
   4. Routing index in .claude/rules/ directs Claude to correct module files based on query context
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Directory structure, template files, and .claude/rules/ routing content
+- [ ] 01-02-PLAN.md — Validation scripts and pre-commit hook
+- [ ] 01-03-PLAN.md — Global loading configuration for cross-project access
 
 ### Phase 2: Core Reference Framework
 **Goal**: Create always-available org structure and disambiguation framework that all module content references
@@ -224,11 +225,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repository Foundation | 0/TBD | Not started | - |
+| 1. Repository Foundation | 0/3 | Planning complete | - |
 | 2. Core Reference Framework | 0/TBD | Not started | - |
 | 3. FI Module Foundation | 0/TBD | Not started | - |
 | 4. FI Advanced & Integration Prep | 0/TBD | Not started | - |
