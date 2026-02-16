@@ -108,49 +108,49 @@ Requirements for initial release. Each maps to roadmap phases.
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 | Pending |
 | FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
 | FOUND-05 | Phase 1 | Pending |
 | FOUND-06 | Phase 1 | Pending |
-| FI-01 | Phase 1 | Pending |
-| FI-02 | Phase 1 | Pending |
-| FI-03 | Phase 1 | Pending |
-| FI-04 | Phase 1 | Pending |
-| FI-05 | Phase 1 | Pending |
-| FI-06 | Phase 1 | Pending |
-| FI-07 | Phase 1 | Pending |
-| MM-01 | Phase 2 | Pending |
-| MM-02 | Phase 2 | Pending |
-| MM-03 | Phase 2 | Pending |
-| MM-04 | Phase 2 | Pending |
-| MM-05 | Phase 2 | Pending |
-| MM-06 | Phase 2 | Pending |
-| MM-07 | Phase 2 | Pending |
-| SD-01 | Phase 2 | Pending |
-| SD-02 | Phase 2 | Pending |
-| SD-03 | Phase 2 | Pending |
-| SD-04 | Phase 2 | Pending |
-| SD-05 | Phase 2 | Pending |
-| SD-06 | Phase 2 | Pending |
-| SD-07 | Phase 2 | Pending |
-| CO-01 | Phase 3 | Pending |
-| CO-02 | Phase 3 | Pending |
-| CO-03 | Phase 3 | Pending |
-| CO-04 | Phase 3 | Pending |
-| CO-05 | Phase 3 | Pending |
-| CO-06 | Phase 3 | Pending |
-| CO-07 | Phase 3 | Pending |
-| INTG-01 | Phase 3 | Pending |
-| INTG-02 | Phase 3 | Pending |
-| INTG-03 | Phase 3 | Pending |
-| INTG-04 | Phase 3 | Pending |
-| E2E-01 | Phase 4 | Pending |
-| E2E-02 | Phase 4 | Pending |
-| E2E-03 | Phase 4 | Pending |
-| SOLN-01 | Phase 4 | Pending |
-| SOLN-02 | Phase 4 | Pending |
-| SOLN-03 | Phase 4 | Pending |
-| SOLN-04 | Phase 4 | Pending |
+| FOUND-03 | Phase 2 | Pending |
+| FOUND-04 | Phase 2 | Pending |
+| FI-01 | Phase 3 | Pending |
+| FI-02 | Phase 3 | Pending |
+| FI-03 | Phase 3 | Pending |
+| FI-04 | Phase 3 | Pending |
+| FI-05 | Phase 4 | Pending |
+| FI-06 | Phase 4 | Pending |
+| FI-07 | Phase 4 | Pending |
+| MM-01 | Phase 5 | Pending |
+| MM-02 | Phase 5 | Pending |
+| MM-03 | Phase 5 | Pending |
+| MM-04 | Phase 5 | Pending |
+| MM-05 | Phase 6 | Pending |
+| MM-06 | Phase 6 | Pending |
+| MM-07 | Phase 6 | Pending |
+| INTG-01 | Phase 6 | Pending |
+| SD-01 | Phase 7 | Pending |
+| SD-02 | Phase 7 | Pending |
+| SD-03 | Phase 7 | Pending |
+| SD-04 | Phase 7 | Pending |
+| SD-05 | Phase 8 | Pending |
+| SD-06 | Phase 8 | Pending |
+| SD-07 | Phase 8 | Pending |
+| INTG-02 | Phase 8 | Pending |
+| CO-01 | Phase 9 | Pending |
+| CO-02 | Phase 9 | Pending |
+| CO-03 | Phase 9 | Pending |
+| CO-04 | Phase 9 | Pending |
+| CO-05 | Phase 10 | Pending |
+| CO-06 | Phase 10 | Pending |
+| CO-07 | Phase 10 | Pending |
+| INTG-03 | Phase 10 | Pending |
+| INTG-04 | Phase 11 | Pending |
+| E2E-01 | Phase 11 | Pending |
+| E2E-02 | Phase 11 | Pending |
+| E2E-03 | Phase 11 | Pending |
+| SOLN-01 | Phase 12 | Pending |
+| SOLN-02 | Phase 12 | Pending |
+| SOLN-03 | Phase 12 | Pending |
+| SOLN-04 | Phase 12 | Pending |
 
 **Coverage:**
 - v1 requirements: 42 total
@@ -159,4 +159,4 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after initial definition*
+*Last updated: 2026-02-16 after roadmap creation*
