@@ -26,7 +26,8 @@ last_verified: 2026-02-17
 | @config-spro.md | SPRO/IMG configuration for Enterprise Structure, Document Types, Pricing, Copy Control, Delivery, Billing, Output, Credit | Configuring SD settings; need SPRO path for pricing procedure (OVKK), item category determination (OVLP), copy control (VTAA/VTLA/VTFL/VTAF), or output (NACE) |
 | @processes.md | Business process flows: standard O2C, returns, credit/debit memos, cash sales, rush orders, consignment, third-party | Understanding end-to-end order-to-cash process; document flow (VBAK→LIKP→VBRK); mapping transactions to roles; ATP and credit check logic |
 | @master-data.md | Master data: customer master (KNA1/KNB1/KNVV), condition records (KONH/KONP), output determination, material sales views (MVKE) | Looking up table fields; finding which table holds a field; CORRECTION blocks for KTGRD, KTGRM, DWERK field locations; pricing condition types |
-| @integration.md | Cross-module integration points (SD-FI, SD-MM) | Understanding VKOA account determination, SD-FI billing postings (Phase 8) |
+| @sd-advanced.md | VKOA account determination walkthrough (dual-axis, 8+ worked examples, pricing-to-VKOA chain, debugging path), 12 decision trees (pricing procedure, access sequence, copy control, partner determination, ATP, credit management), 12 troubleshooting entries (symptom-first, SAP message IDs) | Making SD configuration choices; diagnosing VA01/VF01/VL01N errors; tracing billing to GL account; understanding VKOA setup for SD |
+| @integration.md | SD-FI integration: point catalog (14 touchpoints), transaction traces (VF01 billing-to-FI, PGI COGS), revenue recognition basics, period-end (rebate settlement/revenue accruals/VF04) | Tracing what happens in FI when SD posts; VF01 billing trace; PGI COGS trace; period-end SD-FI sequence |
 | @patterns.md | Solution design patterns | Designing SD solutions for complex scenarios (Phase 12) |
 
 ## Key Concepts

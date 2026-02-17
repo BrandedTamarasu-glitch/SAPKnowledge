@@ -541,3 +541,184 @@ Credit block release workflow: VKM1 (order blocks), VKM4 (delivery blocks), VKM5
 | Strict (all business-critical fields mandatory at order entry) | Regulated industry; zero-tolerance for incomplete data | OVA2: extensive mandatory fields with Error status; consider separate strict procedures for different doc types | Highest data quality; may slow order entry; requires all data available at order creation time |
 
 > **Best practice:** Start with Standard approach. Add fields incrementally based on downstream processing failures (e.g., if delivery creation frequently fails due to missing shipping condition, make it mandatory in the incompletion procedure).
+
+---
+
+## Troubleshooting -- Symptom-Based Diagnosis
+
+> Organized by what the user sees (error message, blocked document, wrong posting, pricing failure). Each entry is self-contained: symptom + root cause + full resolution path inline. SAP message IDs included for searchability. Diagnostic T-codes referenced in each resolution.
+
+### Symptom 1: Incompletion Log Blocks Save or Further Processing
+
+**SAP Messages:** V1 class warnings/errors; incompletion log entries displayed at order save
+**Symptom:** Sales order cannot be saved, or delivery/billing cannot be created because the incompletion log flags mandatory fields as missing.
+**Root Cause:** Incompletion procedure (V_20/OVA2) has fields set to Error status that are not yet maintained on the document. The incompletion procedure may be too strict for the business process.
+**Resolution:**
+1. Open the sales order: VA03 -> Edit -> Incompletion Log (or press the Incompletion Log button)
+2. Review which fields are flagged: the log shows field name, status (Error/Warning), and where to maintain
+3. Maintain the missing fields directly from the incompletion log (double-click navigates to the field)
+4. If the field should not be mandatory: review the incompletion procedure in OVA2 and change the status from Error to Warning, or remove the field from the procedure
+5. Check that the correct incompletion procedure is assigned to the document type in V_20
+
+---
+
+### Symptom 2: "Item Category Not Found" or Wrong Item Category Proposed
+
+**SAP Messages:** V1 302 or similar -- "Item category could not be determined"
+**Symptom:** Sales order line item cannot be created because item category determination fails, or the system proposes an unexpected item category.
+**Root Cause:** The 4-key determination in OVLP has no entry for the combination of: document type + MVKE-MTPOS (item category group) + usage + higher-level item category. Most commonly, MVKE-MTPOS is blank on the material master.
+**Resolution:**
+1. Check material master: MM03 -> Sales Org 1 view -> MTPOS field. If blank, this is the root cause -- set to NORM (standard) or appropriate value in MM02.
+2. Check OVLP: enter the 4-key combination (doc type + MTPOS + usage + higher-level). If no entry exists, create one.
+3. If wrong item category proposed: check OVLP for the combination and verify the proposed item category is correct. Check for unexpected MTPOS values on the material.
+4. For sub-items (BOM explosion): check the higher-level item category key -- this is the 4th key and is often overlooked.
+
+> This is the single most common SD configuration error during implementation. Always check MVKE-MTPOS first.
+
+---
+
+### Symptom 3: Pricing Not Determined / Pricing Procedure Missing
+
+**SAP Messages:** VK class errors; or silently no pricing in the order (all condition values = 0)
+**Symptom:** Sales order has no prices -- all pricing conditions show zero or are missing entirely. No pricing procedure found.
+**Root Cause:** No OVKK entry exists for the combination of: Sales Area + Document Pricing Procedure (from VOV8) + Customer Pricing Procedure (from KNVV-KALKS).
+**Resolution:**
+1. Check OVKK: enter the sales area + doc pricing procedure + customer pricing procedure. If no entry exists, create one pointing to the correct pricing procedure.
+2. Check VOV8: display the sales document type -> verify the Document Pricing Procedure field has a value. If blank, assign one.
+3. Check customer master: VD03 -> Sales Area Data -> KNVV-KALKS (customer pricing procedure). If blank, assign a value in VD02.
+4. If pricing procedure is found but conditions are zero: the issue is condition records, not procedure assignment. Use VA03 -> Item -> Conditions -> Analysis (analysis button on the condition tab) to see which access sequence steps were searched and which records were found.
+
+---
+
+### Symptom 4: "Shipping Point Could Not Be Determined"
+
+**SAP Messages:** V2 class errors -- "Shipping point could not be determined for item"
+**Symptom:** Delivery creation (VL01N) fails because the system cannot determine the shipping point.
+**Root Cause:** No entry in the shipping point determination table for the combination of: Shipping Condition (KNVV-VSBED) + Loading Group (MARC-LADGR) + Plant.
+**Resolution:**
+1. Check customer master: VD03 -> Shipping tab -> VSBED (shipping condition). If blank, assign in VD02.
+2. Check material master: MM03 -> General Plant Data / Storage view -> MARC-LADGR (loading group). If blank, assign in MM02.
+3. Check OVXC: verify an entry exists for the shipping condition + loading group + plant combination -> shipping point.
+4. If all three are correct and OVXC entry exists: check that the delivering plant (MVKE-DWERK or VBAP-WERKS) is correct -- wrong plant may not have a matching OVXC entry.
+
+---
+
+### Symptom 5: Delivery Blocked / Cannot Create Delivery
+
+**SAP Messages:** Various V2 class messages; or delivery creation silently skips items
+**Symptom:** Cannot create delivery from sales order, or delivery creation produces no items. Multiple possible causes.
+**Root Cause (check in this order):**
+1. Delivery block on sales order header (VBAK-LIFSK) -- manual block set by user
+2. Credit block (VKM4) -- customer credit exceeded
+3. No confirmed quantity in schedule lines (VBEP-BMENG = 0) -- ATP check found no stock
+4. Requested delivery date is in the future -- delivery not yet due
+5. Incomplete schedule lines -- schedule line category missing or incorrect
+**Resolution:**
+1. Check VA03 -> Header -> Shipping tab -> Delivery Block field. If set, remove in VA02 (or investigate why it was set).
+2. Check VKM4 for credit-blocked deliveries. Release via VKM4 or increase credit limit in FD32.
+3. Check VA03 -> Item -> Schedule Lines -> Confirmed Quantity. If zero, run availability check manually (VA02 -> Item -> Schedule Lines -> rework ATP).
+4. Check delivery due dates: VL10A shows orders due for delivery by date.
+5. Run VL01N with the specific order number to see the detailed error log.
+
+---
+
+### Symptom 6: VF01/VF04 "Account Determination Error" at Billing
+
+**SAP Messages:** F5 class errors; "Account not found for account key ERL" or "Revenue account determination failed"
+**Symptom:** Billing document creation fails because VKOA cannot determine a GL account for one or more account keys.
+**Root Cause:** Missing VKOA entry for the account key + customer AAG (KTGRD) + material AAG (KTGRM) combination. Most commonly, KTGRD is blank on the customer master or KTGRM is blank on the material master.
+**Resolution:**
+1. Read the error message -- it names the account key (ERL, ERS, MWS, etc.) that failed.
+2. Check customer master: XD03 or VD03 -> Billing tab -> KTGRD (customer account assignment group). **This is the #1 cause -- KTGRD is routinely blank.**
+3. Check material master: MM03 -> Sales Org 2 view -> KTGRM (material account assignment group). **This is the #2 cause.**
+4. Check VKOA: T-code VKOA -> select KOFI -> enter Chart of Accounts + Sales Org + KTGRD + KTGRM + account key. If no entry exists, create one.
+5. If KTGRD and KTGRM are correct and VKOA entry exists: check that the chart of accounts is correct for the company code. Multi-company-code setups with different charts of accounts may have VKOA entries for the wrong chart.
+**Cross-reference:** See Section 1 (VKOA debugging path) above for the full 5-step diagnostic procedure.
+
+---
+
+### Symptom 7: Billing Document Created but No FI Document
+
+**SAP Messages:** No error -- billing document number exists in VF03 but no accounting document link
+**Symptom:** Billing document was created successfully but no FI document was generated. No customer open item appears in FBL5N.
+**Root Cause (check in this order):**
+1. Pro forma billing type (F5/F8) -- pro forma does NOT create FI documents by design
+2. Billing block on the billing document (VFX3) -- document is blocked and FI posting is suppressed
+3. Billing type configuration (VOFA) -- accounting relevance may be incorrectly set
+**Resolution:**
+1. Check billing type: VF03 -> display billing document -> check billing type. If F5 or F8, this is pro forma -- no FI document is expected.
+2. Check VFX3: is the billing document blocked? If yes, release the block and re-process.
+3. Check VOFA: display the billing type configuration -> verify the accounting relevance and posting settings.
+4. If billing type is correct (F2, G2, L2, RE) and not blocked: check VF03 -> Environment -> Accounting Document for error details. The billing may have been created but the FI posting may have failed.
+
+---
+
+### Symptom 8: Billing Quantity Wrong or Zero
+
+**SAP Messages:** No specific error -- billing document has unexpected quantities
+**Symptom:** Billing document shows wrong quantity or zero quantity for one or more items.
+**Root Cause:** Copy control (VTFL/VTAF) billing quantity source misconfigured, or PGI not posted for delivery-related billing.
+**Resolution:**
+1. Check copy control: VTFL (for delivery-related billing) -> item level -> Billing Quantity field. Value E = from delivery quantity; blank = from order quantity. Ensure correct setting.
+2. Check delivery: VL03N -> verify delivery quantity and PGI status. For delivery-related billing, PGI must be posted (goods issue status = C) before billing. If PGI not posted, bill from delivery is blocked.
+3. Check pricing type in VTFL: if pricing type = D (redetermine), pricing runs fresh and may calculate different amounts than expected.
+4. Check partial deliveries: if the delivery was a partial delivery, the billing quantity will match the delivery quantity, not the full order quantity.
+
+---
+
+### Symptom 9: Sales Order/Delivery Blocked by Credit Check
+
+**SAP Messages:** V1 class messages at order save; VKM1/VKM4 block entries
+**Symptom:** Sales order is blocked at creation or delivery is blocked because customer credit exposure exceeds limit.
+**Root Cause:** Customer's total credit exposure (open items + open orders + open deliveries + unbilled billing docs) exceeds the credit limit set in FD32.
+**Resolution:**
+1. Check credit data: FD32 -> enter customer + credit control area -> review credit limit vs total exposure.
+2. Review blocked documents: VKM1 (blocked orders), VKM4 (blocked deliveries), VKM5 (blocked GI).
+3. To release: select the blocked document in VKM1/VKM4/VKM5 and release. This is a one-time override -- if the customer creates another order, it will be blocked again.
+4. To increase limit: FD32 -> change credit limit. Consider the customer's payment history and risk profile.
+5. For systematic resolution: review customer payment behavior in FBL5N (open items, aging); consider dunning (F150) for overdue items; the credit block is a symptom of the customer's payment behavior.
+
+---
+
+### Symptom 10: Credit Check Not Executing Despite Configuration
+
+**SAP Messages:** No error -- orders process without credit check even though credit management is configured
+**Symptom:** Customer should be credit-checked but orders/deliveries are created without any credit block.
+**Root Cause (check in this order):**
+1. Credit group not assigned to the document type in VOV8
+2. Automatic credit check rules not defined in OVA8 for the credit control area
+3. Credit control area not assigned to the company code (OB38)
+4. Customer has no credit data in FD32 (no credit limit set = no check)
+**Resolution:**
+1. Check VOV8: display the sales document type -> Credit Group field. If blank, no credit check is triggered for this document type.
+2. Check OVA8: verify automatic credit check rules exist for the credit control area. If no rules, no automatic check runs.
+3. Check OB38: verify the credit control area is assigned to the company code.
+4. Check FD32: verify the customer has a credit limit set in the correct credit control area. No credit limit = no credit check.
+
+---
+
+### Symptom 11: Condition Record Not Found / Wrong Price
+
+**SAP Messages:** VK class messages; or no error but pricing shows unexpected values
+**Symptom:** Sales order shows wrong price, unexpected discount, or zero price for a condition type that should have a value.
+**Root Cause:** Access sequence searched all condition tables but found no matching record, or found a record from a less-specific table that gives an unexpected value.
+**Resolution:**
+1. Use pricing analysis: VA03 -> Item -> Conditions tab -> click Analysis button. This shows every access sequence step, which condition table was searched, and whether a record was found.
+2. Check condition records: VK13 -> enter condition type -> check that a record exists for the correct key combination (customer+material, material+sales org, etc.) with valid dates.
+3. Check validity dates: condition records have valid-from and valid-to dates. If today's date is outside the validity period, the record is not found.
+4. Check access sequence priority: if records exist in multiple tables, the first match wins (if exclusive). A record in a more-specific table overrides a record in a less-specific table.
+5. For wrong discount: check condition exclusion groups (V/09). If multiple discounts apply but exclusion groups are configured, only the "best" discount may be applied.
+
+---
+
+### Symptom 12: Output Not Generated / Wrong Output
+
+**SAP Messages:** V4 class messages; or no output appears on the document
+**Symptom:** Sales order confirmation, delivery note, or invoice is not generated, or the wrong output type appears.
+**Root Cause:** Output determination procedure not assigned to the document type, or output condition records missing for the output type + key combination.
+**Resolution:**
+1. Check output on the document: VA03/VL03N/VF03 -> Header -> Output. If no output entries appear, determination failed.
+2. Check NACE: select the application (V1 for sales, V2 for delivery, V3 for billing) -> verify the output determination procedure is assigned to the document type.
+3. Check output condition records: VV33 -> enter the output type (e.g., BA00 for order confirmation) -> check that a record exists for the correct key combination (sales org + order type, or customer + sales org).
+4. Check output processing log: if output exists on the document but wasn't sent, check the processing log (output tab -> select the output -> Processing Log). Common failures: printer not found, SAPconnect not configured for email, partner function not maintained.
+5. For manual sending: select the output on the document -> click "Further Data" to check medium and timing -> click "Repeat Output" to resend.
