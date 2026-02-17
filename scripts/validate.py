@@ -37,6 +37,7 @@ VALID_MODULES = {"fi", "mm", "sd", "co", "cross-module", "reference"}
 VALID_CONTENT_TYPES = {
     "index", "tcodes", "config-spro", "processes", "master-data",
     "integration", "patterns", "e2e-process", "lookup-table",
+    "account-determination", "decision-trees-and-troubleshooting",
 }
 VALID_CONFIDENCE = {"high", "medium", "low"}
 
@@ -67,6 +68,8 @@ TOKEN_BUDGETS = {
     "integration": 3000,
     "e2e-process": 5000,
     "lookup-table": 5000,
+    "account-determination": 5000,
+    "decision-trees-and-troubleshooting": 5000,
 }
 
 RULES_TOKEN_CAP = 1500
