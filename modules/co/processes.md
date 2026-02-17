@@ -193,3 +193,86 @@ Check MM03 → Accounting 1 view:
 > **S/4HANA Note:** In S/4HANA, Material Ledger is mandatory. Actual costing runs (CKMLCP) determine actual prices monthly. The CK11N/CK24 process still exists for standard cost estimates but actual costing provides a more accurate alternative.
 
 ---
+
+## 4. Cost Center Planning
+
+Cost center planning establishes the budget baseline for plan/actual comparison reporting. Planning is typically done annually with monthly distribution.
+
+### Narrative
+
+**Step 1 — Define Planning Framework** (CO Manager)
+Set up for the planning cycle:
+- Confirm planning version (version 0 for integrated plan/actual, or separate version)
+- Confirm planning layout (OKP1) includes required cost elements
+- Confirm planning profile (KSPI) is assigned
+
+**Step 2 — Plan Primary Costs** (Cost Accountant)
+Enter planned costs in KP06:
+- Select cost center, version, period range, fiscal year
+- Enter planned amounts by cost element (salaries, rent, supplies, etc.)
+- Distribution options: equal distribution across periods, specific period amounts, or reference to prior year actuals
+
+**Step 3 — Plan Activity Output** (Cost Accountant)
+Enter planned activity quantities in KP26:
+- Select cost center, activity type, version, fiscal year
+- Enter planned activity quantity (e.g., 2000 machine hours)
+- Enter planned activity price (fixed + variable per unit) or let the system calculate from planned costs / planned activity quantity
+
+**Step 4 — Plan Statistical Key Figures** (Cost Accountant)
+If allocation cycles use statistical key figures as allocation basis, enter planned values in KB31N. Example: planned headcount per cost center for HR cost allocation.
+
+**Step 5 — Review Plan Data** (CO Manager)
+Review plan using S_ALR_87013611 (plan/actual comparison — plan column shows entered values, actual is zero at start of year). Verify plan totals are reasonable and consistent with business expectations.
+
+### Summary Table
+
+| Step | Activity | T-code | Role | Output |
+|------|----------|--------|------|--------|
+| 1 | Define planning framework | OKP1/KSPI | CO Manager | Planning layouts and profiles ready |
+| 2 | Plan primary costs | KP06 | Cost Accountant | Planned costs by CE and period |
+| 3 | Plan activity output/prices | KP26 | Cost Accountant | Planned activity rates |
+| 4 | Plan statistical key figures | KB31N | Cost Accountant | Planned allocation bases |
+| 5 | Review plan data | S_ALR_87013611 | CO Manager | Verified plan totals |
+
+---
+
+## 5. Period-End CO Closing Sequence
+
+This is the recommended sequence for the complete CO period-end close. Steps must be executed in order — each depends on the prior step's output.
+
+> **Cross-reference:** FI period-end close is documented in `modules/fi/processes.md`. MM period-end close (MMPV, CKMI) is in `modules/mm/processes.md`. CO period-end typically runs AFTER FI and MM period-end to capture all postings.
+
+### Sequence
+
+| Step | Activity | T-code | Purpose | Dependencies |
+|------|----------|--------|---------|--------------|
+| 1 | Repost CO line items | KB61 | Correct mis-postings (move costs between CO objects) | Before any allocations — must run first |
+| 2 | Calculate actual overhead | KGI2 | Apply overhead surcharges to orders/cost centers based on costing sheets | After reposting — overhead calculated on corrected balances |
+| 3 | Run assessment cycles | KSU5 | Allocate overhead CC costs to receivers using secondary CE (cat 42) | After overhead calc — includes overhead in allocation |
+| 4 | Run distribution cycles | KSV5 | Allocate costs preserving original CEs | After overhead calc — same dependency as assessment |
+| 5 | Settle internal orders | KO88 | Move collected costs from orders to permanent receivers | After allocations — includes allocated costs in settlement |
+| 6 | Settle production orders | CO88 | Move production order costs to receivers (if PP active) | After WIP/RA calculation (step 6a) |
+| 6a | WIP/Results analysis | KKAX/KKA2 | Calculate work-in-process for open production orders (if PP active) | Before production order settlement |
+| 7 | Calculate actual activity prices | KSII | Determine actual cost rates for activity types | After all allocations and settlements |
+| 8 | Transfer pricing (PCA) | 1KEG | Execute profit center transfer pricing (if configured) | After all settlements |
+| 9 | Lock CO period | OKP1 / COPI | Prevent further postings to the closed period | After all postings complete |
+
+### Key Rules
+
+1. **Reposting (KB61) MUST run first** — allocations and settlements use the balances at execution time. Reposting after allocation creates double-counting.
+2. **Overhead (KGI2) before allocations** — overhead surcharges should be included in the allocated amounts.
+3. **Allocations (KSU5/KSV5) before settlement (KO88)** — if a cost center receives allocated costs and those costs should be on an internal order, the allocation must run first so the costs are available for settlement.
+4. **Settlement (KO88/CO88) after allocations** — settlement captures the final cost picture including all allocations.
+5. **Actual price calculation (KSII) last** — uses final actual costs and actual activity quantities to determine actual activity rates. This is a reporting/analysis step, not a cost movement.
+
+### Timing Relative to FI/MM
+
+```
+FI Period-End (month-end close, accruals, reclassifications)
+    → MM Period-End (MMPV material price changes, CKMI ML closing)
+        → CO Period-End (this sequence: repost → allocate → settle → close)
+```
+
+CO period-end depends on FI and MM being complete. All FI postings with CO account assignments must be posted before CO allocations run, or the allocations will miss those costs.
+
+---
