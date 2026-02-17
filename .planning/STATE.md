@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 2 - Core Reference Framework
+**Current focus:** Phase 3 - FI Module Foundation
 
 ## Current Position
 
-Phase: 2 of 12 (Core Reference Framework) — COMPLETE
-Plan: 2 of 2 in Phase 2
-Status: Phase 2 complete; both plans (02-01 and 02-02) done
-Last activity: 2026-02-16 — Completed 02-01-PLAN.md (org structure comprehensive reference)
+Phase: 3 of 12 (FI Module Foundation) — In progress
+Plan: 1 of N in Phase 3
+Status: 03-01 complete (tcodes.md); remaining Phase 3 plans pending
+Last activity: 2026-02-17 — Completed 03-01-PLAN.md (FI T-code reference, 65 T-codes)
 
-Progress: [██░░░░░░░░] 17%
+Progress: [███░░░░░░░] 25%
 
-(2 of 12 phases complete; all 6 known plans have SUMMARY.md)
+(3 of 12 phases partially complete; 7 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (4 Phase 1 + 2 Phase 2)
-- Average duration: ~2-3min
-- Total execution time: ~0.3 hours
+- Total plans completed: 7 (4 Phase 1 + 2 Phase 2 + 1 Phase 3)
+- Average duration: ~3min
+- Total execution time: ~0.35 hours
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [██░░░░░░░░] 17%
 |-------|-------|-------|----------|
 | 01-repository-foundation | 4 | ~12min | ~3min |
 | 02-core-reference-framework | 2 | ~5min | ~2.5min |
+| 03-fi-module-foundation | 1 so far | ~3min | ~3min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (4min), 01-04 (3min), 02-01 (2min), 02-02 (1min), 02-01 rerun (2min)
-- Trend: Stable
+- Last 5 plans: 02-01 (2min), 02-02 (1min), 02-01 rerun (2min), 03-01 (3min)
+- Trend: Stable ~2-3min per plan
 
 *Updated after each plan completion*
 
@@ -59,6 +60,11 @@ Recent decisions affecting current work:
 - Sales Area documented as special non-table subsection (not a separate DB entity) to prevent confusion (02-01)
 - Segment org unit carries CRITICAL ECC 6 NOTE about New GL prerequisite — important disambiguation (02-01)
 - Purchasing Org three-assignment-mode pattern documented inline (02-01)
+- T-code reference format: frontmatter + workflow index table + submodule sections with ### headings (03-01)
+- FS10N labeled as "Classic GL" despite menu saying "(New)" — important disambiguation for New GL environments (03-01)
+- S_ALR corrections embedded in workflow index + two T-code Gotcha fields for maximum discoverability (03-01)
+- F110 APP 7-step sequence documented inline in T-code entry, not deferred to process file (03-01)
+- CRITICAL prefix used in Gotcha fields for the most dangerous errors (03-01)
 
 ### Pending Todos
 
@@ -70,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-16
-Stopped at: Phase 2 complete. Ready for Phase 3 (FI module or next planned phase).
+Last session: 2026-02-17
+Stopped at: Completed 03-01-PLAN.md (FI T-code reference, 65 T-codes)
 Resume file: None
