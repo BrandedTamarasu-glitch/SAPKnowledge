@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: FI Module Foundation** - T-codes, SPRO paths, processes, master data
 - [x] **Phase 4: FI Advanced & Integration Prep** - Account determination, decision trees, troubleshooting
 - [x] **Phase 5: MM Module Foundation** - T-codes, SPRO paths, processes, master data
-- [ ] **Phase 6: MM Advanced & FI Integration** - OBYC account determination, decision trees, MM-FI integration
+- [x] **Phase 6: MM Advanced & FI Integration** - OBYC account determination, decision trees, MM-FI integration
 - [ ] **Phase 7: SD Module Foundation** - T-codes, SPRO paths, processes, master data
 - [ ] **Phase 8: SD Advanced & FI Integration** - VKOA account determination, pricing basics, SD-FI integration
 - [ ] **Phase 9: CO Module Foundation** - T-codes, SPRO paths, processes, master data
@@ -236,8 +236,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 2. Core Reference Framework | 2/2 | Complete | 2026-02-16 |
 | 3. FI Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 4. FI Advanced & Integration Prep | 2/2 | Complete | 2026-02-17 |
-| 5. MM Module Foundation | 0/TBD | Not started | - |
-| 6. MM Advanced & FI Integration | 0/TBD | Not started | - |
+| 5. MM Module Foundation | 4/4 | Complete | 2026-02-17 |
+| 6. MM Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
 | 7. SD Module Foundation | 0/TBD | Not started | - |
 | 8. SD Advanced & FI Integration | 0/TBD | Not started | - |
 | 9. CO Module Foundation | 0/TBD | Not started | - |

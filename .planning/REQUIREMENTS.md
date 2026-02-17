@@ -32,9 +32,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MM-02**: SPRO/IMG configuration paths for purchasing, inventory management, and invoice verification with step-by-step guidance
 - [x] **MM-03**: Business process maps for procure-to-pay tied to specific transactions and config
 - [x] **MM-04**: Master data reference covering material master, vendor master, purchasing info records, source lists — key fields and relationships
-- [ ] **MM-05**: Account determination walkthrough for MM (OBYC) — movement types to GL account mapping
-- [ ] **MM-06**: Configuration decision trees for common MM scenarios (valuation, split valuation, release strategy, MRP)
-- [ ] **MM-07**: Common MM gotchas and troubleshooting guide specific to ECC 6
+- [x] **MM-05**: Account determination walkthrough for MM (OBYC) — movement types to GL account mapping
+- [x] **MM-06**: Configuration decision trees for common MM scenarios (valuation, split valuation, release strategy, MRP)
+- [x] **MM-07**: Common MM gotchas and troubleshooting guide specific to ECC 6
 
 ### SD — Sales & Distribution
 
@@ -58,7 +58,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Integration
 
-- [ ] **INTG-01**: MM→FI integration point documentation (goods receipt/issue postings, invoice verification, OBYC mapping)
+- [x] **INTG-01**: MM→FI integration point documentation (goods receipt/issue postings, invoice verification, OBYC mapping)
 - [ ] **INTG-02**: SD→FI integration point documentation (billing postings, revenue recognition, VKOA mapping)
 - [ ] **INTG-03**: CO→FI integration point documentation (cost element types, reconciliation ledger, real-time integration)
 - [ ] **INTG-04**: MM↔SD integration point documentation (availability check, goods issue for delivery, returns)
@@ -123,10 +123,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | MM-02 | Phase 5 | Complete |
 | MM-03 | Phase 5 | Complete |
 | MM-04 | Phase 5 | Complete |
-| MM-05 | Phase 6 | Pending |
-| MM-06 | Phase 6 | Pending |
-| MM-07 | Phase 6 | Pending |
-| INTG-01 | Phase 6 | Pending |
+| MM-05 | Phase 6 | Complete |
+| MM-06 | Phase 6 | Complete |
+| MM-07 | Phase 6 | Complete |
+| INTG-01 | Phase 6 | Complete |
 | SD-01 | Phase 7 | Pending |
 | SD-02 | Phase 7 | Pending |
 | SD-03 | Phase 7 | Pending |
