@@ -547,3 +547,205 @@ Recommended tolerance keys by scenario:
 | MTS — Strategy 40 | Planning with final assembly | Forecast for components, assemble on sales order | Strategy group 40; combination of PIR + sales order-driven assembly | Reduces FG inventory; components planned to forecast; assembly to order |
 | MTO — Strategy 20 | Make-to-Order (individual) | Customer-specific production; each SO creates individual planned order | Strategy group 20; individual customer stock | Full traceability to customer order; no shared stock; highest complexity |
 | MTO — Strategy 50 | Make-to-Order (planning) | SO-driven but no individual stock segment | Strategy group 50; planned orders linked to sales order but stock is shared | Simpler than 20; SO triggers production; stock fungible once produced |
+
+---
+
+## 3. Troubleshooting — Symptom-Based Diagnosis
+
+> Organized by what the user sees (error message, blocked document, wrong posting, MRP failure). Each entry is self-contained: symptom + root cause + full resolution path inline. SAP message IDs included for searchability. Diagnostic T-codes referenced in each resolution.
+
+---
+
+### Purchasing
+
+---
+
+### Symptom 1: "Account Determination Error" When Saving PO or Posting GR
+
+**SAP Messages:** F5 class errors; "Account not defined for transaction key BSX" or "Account not defined for transaction key GBB"
+**Symptom:** Cannot save PO with account assignment, or MIGO GR posting fails with account determination error.
+**Root Cause:** Missing OBYC configuration for the valuation class + transaction key combination for the material's chart of accounts and valuation grouping code.
+**Resolution:**
+1. Read the error message — it names the missing transaction key (BSX, GBB, WRX, etc.)
+2. Check the material's valuation class: MM03 -> Accounting 1 view -> MBEW-BKLAS
+3. Run OMWB simulation: enter the material number -> Simulation -> verify GL account determination for each transaction key
+4. Open OBYC: enter the transaction key from the error -> check if an entry exists for your chart of accounts + valuation class. If missing, create the entry.
+5. For GBB errors: also check that the correct account modifier exists (VBR, VNG, etc. depending on movement type)
+**Cross-reference:** See Section 1 (OBYC debugging path) for the full 5-step diagnostic procedure.
+
+---
+
+### Symptom 2: ME59N Fails to Convert PR to PO (Items Skipped Silently)
+
+**SAP Messages:** No specific error — ME59N log shows items skipped without clear explanation.
+**Symptom:** ME59N automatic PR-to-PO conversion runs but does not create POs for some or all PRs.
+**Root Cause:** No valid source determination for the material/plant combination. ME59N requires either a source list entry (EORD) or a purchasing info record (EINE/EINA) with a valid vendor.
+**Resolution:**
+1. Check source list: ME03 -> enter material + plant -> verify valid source list entry exists with current validity dates
+2. Check OMGM: is source list requirement activated for this plant + material type? If yes, source list entry is mandatory.
+3. Check info records: ME13 -> verify purchasing info record exists for the vendor + material + purchasing org with current validity
+4. Check PR status: ME53N -> verify PR is released (approved) and not already converted to a PO
+5. Check ME59N log: review the log output for specific skip reasons per item
+
+---
+
+### Symptom 3: PO Release Strategy Not Triggering or Wrong Approver
+
+**SAP Messages:** No specific error — PO appears to skip release or routes to wrong release code.
+**Symptom:** PO should require approval based on value/org criteria but either releases automatically or shows wrong release strategy.
+**Root Cause:** Classification characteristics on the PO do not match the release strategy conditions. The release strategy is assigned via SAP classification (CT04 characteristics matched against PO attributes).
+**Resolution:**
+1. Check current release status: ME23N -> display PO -> Release Strategy tab -> verify which strategy is assigned (or if none)
+2. Check release strategy config: ME28 -> look up the expected strategy -> verify characteristic values match PO attributes (total value, material group, plant, purchasing group)
+3. If no strategy assigned: the PO's characteristic values may fall outside all defined strategy conditions. Review CT04/CL24N classification.
+4. If wrong strategy: check the priority/order of strategies and the characteristic value ranges — overlapping ranges may cause incorrect assignment.
+
+---
+
+### Inventory Management
+
+---
+
+### Symptom 4: M7 021 "Deficit of GR Quantity" on GR Reversal or Return
+
+**SAP Messages:** M7 021 — "Deficit of ... in GR quantity for item ... of PO ..."
+**Symptom:** Attempting to reverse a goods receipt (movement type 102) or post a return to vendor (122) but the posting is blocked.
+**Root Cause:** Insufficient stock to cover the reversal — either the stock has already been consumed (issued via 201/261), or the invoice has been posted and GR-Based Invoice Verification prevents reversal.
+**Resolution:**
+1. Check current stock: MB51 -> filter by material + plant + movement types -> verify the GR quantity minus subsequent issues leaves enough stock for reversal
+2. Check PO history: EKBE -> PO number + item -> see all GR, GI, and invoice postings. If invoice exists and WEBRE is active, reversal may be blocked.
+3. If invoiced: check OMBZ (return posting with invoice) — configures whether returns (122) are allowed when invoices exist
+4. If stock consumed: the consumption must be reversed first (e.g., 262 to reverse 261) before the GR can be reversed
+
+---
+
+### Symptom 5: M7 090 "Accounting Data Not Yet Maintained for Material"
+
+**SAP Messages:** M7 090 — "Accounting data in the plant ... not yet maintained for material ..."
+**Symptom:** MIGO goods movement fails at a plant where the material is not fully extended.
+**Root Cause:** Material master Accounting 1 view (MBEW record) does not exist for the plant/valuation area where the movement is being posted. The material may exist at other plants but has not been extended to this one.
+**Resolution:**
+1. Check material master: MM03 -> enter material -> select Accounting 1 view + the relevant plant -> if view is missing, this confirms the issue
+2. Extend the material: MM01 -> extend to the plant -> populate Accounting 1 view (valuation class BKLAS, price control VPRSV, standard price or MAP)
+3. After extending, retry the goods movement in MIGO
+
+---
+
+### Symptom 6: Wrong GL Account on Goods Movement
+
+**SAP Messages:** No error — posting succeeds but posts to an unexpected GL account.
+**Symptom:** MIGO goods movement posts to the wrong GL account (e.g., inventory posts to a consumption account, or wrong inventory account used).
+**Root Cause:** OBYC configuration has incorrect valuation class -> GL account mapping for the relevant transaction key, OR the material has the wrong valuation class in MBEW-BKLAS.
+**Resolution:**
+1. Check the material's valuation class: MM03 -> Accounting 1 view -> MBEW-BKLAS -> verify this is the correct valuation class for this material type
+2. Run OMWB simulation: enter the material -> check which GL accounts OBYC resolves for each transaction key
+3. Open OBYC: navigate to the transaction key in question -> check the GL account assigned for your chart of accounts + valuation class
+4. If the valuation class is wrong on the material master: change it via MM02 (only possible if no stock exists; if stock exists, use MR21 to clear stock value first)
+5. If the OBYC mapping is wrong: correct the GL account in OBYC for the valuation class + transaction key combination
+
+---
+
+### Symptom 7: Posting Period Not Open for Materials (M7 053)
+
+**SAP Messages:** M7 053 — "Posting only possible in periods ..."
+**Symptom:** MIGO goods movement fails because the MM posting period is closed.
+**Root Cause:** Either MMPV has not opened the current MM period, or OB52 has not opened the FI posting period for account type M (materials). These are independent controls — both must be open.
+**Resolution:**
+1. Check MM period: OMSY -> verify the current MM posting period for the company code (table MARV). If the period is old, run MMPV to open the new period.
+2. Check FI posting period: OB52 -> check account type M (materials) -> verify the period is open. Also check the "+" wildcard row — an explicit M row overrides the wildcard.
+3. If emergency posting to a closed MM period is needed: MMRV allows posting to a previously closed period (use with caution — audit trail implications).
+
+> **CRITICAL:** MMPV and OB52 are independent controls. Opening MM period via MMPV does NOT open the FI posting period. Opening FI period in OB52 does NOT open the MM period. You must manage both. See `modules/mm/integration.md` Section 5 for full period-end guidance.
+
+---
+
+### Invoice Verification
+
+---
+
+### Symptom 8: MIRO Invoice Blocked (Tolerance Exceeded)
+
+**SAP Messages:** M8 082 — "Greater than the tolerance limit upper price"; M8 084 — "Less than the tolerance limit lower price"; M8 504 — "Quantity variance exceeds tolerance"
+**Symptom:** MIRO invoice is blocked automatically after posting; appears in MRBR with tolerance exceedance blocking reason.
+**Root Cause:** Invoice price, quantity, or amount exceeds the tolerance limits configured in OMR6 for the relevant tolerance keys (PP, DQ, ST, etc.).
+**Resolution:**
+1. Check the blocking reason: MRBR -> enter the invoice document -> see which tolerance key was exceeded
+2. Check tolerance limits: OMR6 -> check the specific tolerance key limits for the company code
+3. Verify PO terms: ME23N -> compare PO price and quantity against the invoice
+4. Verify GR quantities: MB51 -> filter by PO number -> confirm received quantities match invoice
+5. If the variance is legitimate (price increase, partial delivery): release via MRBR after verification
+6. If the variance is an error: correct the invoice (MR8M to cancel + re-enter MIRO) or correct the PO (ME22N)
+
+---
+
+### Symptom 9: MIRO "No GR Exists" Despite Goods Receipt Posted
+
+**SAP Messages:** Varies — "No goods receipt exists for purchase order item"
+**Symptom:** MIRO will not post because it cannot find a goods receipt, even though MIGO GR was posted.
+**Root Cause:** GR-Based Invoice Verification (LFM1-WEBRE) is active, and either the GR was posted against the wrong PO line, wrong PO number, or the GR movement type was incorrect.
+**Resolution:**
+1. Check PO history: EKBE -> enter PO number + item -> verify a GR line (movement type 101) exists for the correct item
+2. If no EKBE entry: the GR was posted against a different PO or PO item. Check MB51 for the material to find the material document and trace its PO reference.
+3. Check WEBRE setting: XK03 -> vendor purchasing data (LFM1) -> GR-Based IV indicator. If WEBRE = X, MIRO strictly requires matching GR.
+4. If GR was posted to wrong PO item: reverse the GR (MIGO 102) and re-post to the correct PO item
+
+---
+
+### Symptom 10: GR/IR Account Balance Growing — Never Clears
+
+**SAP Messages:** No error — account balance visible in FS10N/FAGLB03 growing month over month.
+**Symptom:** GR/IR clearing account (e.g., 191100) has an increasing balance that should be zero or near-zero at period end.
+**Root Cause (check in this order):**
+1. GR/IR account not set as open-item managed (FS00 OI indicator missing) -> F.13 cannot clear
+2. F.13 automatic clearing not being run (or not run frequently enough)
+3. One-sided items accumulating: GRs without invoices (or invoices without GRs)
+4. F.13 clearing criteria mismatch (OB74) — assignment field not matching between GR and IR postings
+**Resolution:**
+1. Check FS00: display the GR/IR GL account -> verify Open Item Management = X. If not set, this is the root cause — but changing OI management on an account with postings requires clearing all items first. See `modules/fi/fi-advanced.md` Pitfall 7.
+2. Run F.13 in test mode: check if items would be cleared. If items match but are not clearing, check OB74 clearing criteria.
+3. Run MR11 for genuine one-sided items (GR posted, invoice will never arrive)
+4. Run MB5S for GR/IR balance analysis to identify the specific open items
+
+---
+
+### MRP
+
+---
+
+### Symptom 11: MRP Not Generating Planned Orders or Purchase Requisitions
+
+**SAP Messages:** No error in MD01/MD02 — MRP runs but does not create procurement proposals for a specific material.
+**Symptom:** MD04 shows stock below requirements but no planned orders or PRs appear after MRP run.
+**Root Cause (check in this order):**
+1. MRP type = ND (no planning) in material master
+2. Procurement type mismatch: MARC-BESKZ = F (in-house production) but expecting external PRs
+3. MRP controller (MARC-DISPO) not included in the MD01 selection criteria
+4. Fixed lot size (MARC-BSTFE) = 0 when lot sizing = FX
+5. Planning time fence (MARC-FXHOR) blocking new proposals in the near term
+**Resolution:**
+1. Check MARC-DISMM: MM03 -> MRP 1 view -> MRP type. If ND, change to appropriate type (PD, VB, VV per Decision Tree 10)
+2. Check MARC-BESKZ: MRP 2 view -> Procurement type. E = external (creates PRs), F = in-house (creates planned orders), X = both
+3. Check MD01 selection: verify MRP controller, plant, and processing key (NEUPL for full regenerative run)
+4. Check MD04: review the stock/requirements list to see if requirements exist but proposals are suppressed by lot sizing or time fence
+5. Run MD02 (single-item multi-level) for the specific material to isolate the issue from a full plant run
+
+---
+
+### Symptom 12: MRP Exception Messages — Understanding and Resolution
+
+**SAP Messages:** Displayed in MD04/MD06 as exception message codes (e.g., 06, 07, 08, 10, 20, 25, 50, 57, 60)
+**Symptom:** MRP shows exception messages on materials that need planner attention.
+**Root Cause:** Exception messages are normal MRP output — they flag situations requiring human review, not errors. Key codes:
+- **06** — Delivery date in the past (planned order needs rescheduling)
+- **07** — Order finish date in the past
+- **08** — MRP date in the past
+- **10** — Stock below safety stock
+- **20** — Planned order has been brought forward
+- **25** — Planned order falls within planning time fence
+- **50** — Opening period too short
+- **57** — Receipt not within tolerance for existing requirement
+- **60** — Planned order has been postponed
+**Resolution:**
+1. Use MD06 (collective MRP list) to review exception messages by MRP controller
+2. Prioritize: messages 06/07/08 (past-due) need immediate rescheduling; 10 (safety stock) needs expediting; 25 (time fence) may need manual release
+3. For recurring exception messages: review lot sizing parameters, lead times, and safety stock settings in the material master to reduce noise

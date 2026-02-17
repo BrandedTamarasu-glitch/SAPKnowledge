@@ -26,7 +26,8 @@ last_verified: 2026-02-16
 | @config-spro.md | SPRO/IMG configuration for Enterprise Structure, Purchasing, IM, LIV, Valuation | Configuring MM settings; need SPRO path for tolerance keys (OMR6) or PO doc types (OMH6); valuation level setup |
 | @processes.md | Business process flows: P2P (PR→PO→GR→MIRO→F110), outline agreements, physical inventory | Understanding end-to-end procurement process; three-way match logic; mapping transactions to roles |
 | @master-data.md | Master data: material master (all views/tables), vendor (LFA1/LFB1/LFM1), info records (EINA/EINE), source lists (EORD) | Looking up table fields; finding which view/table holds a field; CORRECTION blocks for commonly-wrong field locations |
-| @integration.md | Cross-module integration points (MM-FI, MM-SD) | Understanding OBYC account determination, MM-FI posting logic (Phase 6) |
+| @mm-advanced.md | OBYC account determination walkthrough (dual-axis, 10+ worked examples, debugging path), 12 decision trees (valuation, release strategy, MRP, split valuation, batch management), 12 troubleshooting entries (symptom-first, SAP message IDs) | Making MM configuration choices; diagnosing MIGO/MIRO errors; tracing movement type to GL account; understanding OBYC setup for MM |
+| @integration.md | MM-FI integration: point catalog (20 touchpoints), transaction traces (MIGO 101, MIRO), GR/IR clearing (F.13/MR11), period-end (MMPV/CKMLCP/MR21) | Tracing what happens in FI when MM posts; GR/IR clearing troubleshooting; period-end MM-FI sequence |
 | @patterns.md | Solution design patterns | Designing MM solutions for complex scenarios (Phase 12) |
 
 ## Key Concepts
