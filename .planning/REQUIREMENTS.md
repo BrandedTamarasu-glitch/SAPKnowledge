@@ -38,10 +38,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### SD — Sales & Distribution
 
-- [ ] **SD-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
-- [ ] **SD-02**: SPRO/IMG configuration paths for sales, shipping, billing, and pricing with step-by-step guidance
-- [ ] **SD-03**: Business process maps for order-to-cash tied to specific transactions and config
-- [ ] **SD-04**: Master data reference covering customer master, material master (sales views), pricing conditions, output determination — key fields and relationships
+- [x] **SD-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
+- [x] **SD-02**: SPRO/IMG configuration paths for sales, shipping, billing, and pricing with step-by-step guidance
+- [x] **SD-03**: Business process maps for order-to-cash tied to specific transactions and config
+- [x] **SD-04**: Master data reference covering customer master, material master (sales views), pricing conditions, output determination — key fields and relationships
 - [ ] **SD-05**: Account determination walkthrough for SD (VKOA) — billing document to GL account mapping
 - [ ] **SD-06**: Configuration decision trees for common SD scenarios (pricing procedures, copy control, partner determination, availability check)
 - [ ] **SD-07**: Common SD gotchas and troubleshooting guide specific to ECC 6
@@ -127,10 +127,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | MM-06 | Phase 6 | Complete |
 | MM-07 | Phase 6 | Complete |
 | INTG-01 | Phase 6 | Complete |
-| SD-01 | Phase 7 | Pending |
-| SD-02 | Phase 7 | Pending |
-| SD-03 | Phase 7 | Pending |
-| SD-04 | Phase 7 | Pending |
+| SD-01 | Phase 7 | Complete |
+| SD-02 | Phase 7 | Complete |
+| SD-03 | Phase 7 | Complete |
+| SD-04 | Phase 7 | Complete |
 | SD-05 | Phase 8 | Pending |
 | SD-06 | Phase 8 | Pending |
 | SD-07 | Phase 8 | Pending |
