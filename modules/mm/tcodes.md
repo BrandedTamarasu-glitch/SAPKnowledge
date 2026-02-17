@@ -87,6 +87,7 @@ last_verified: 2026-02-16
 
 **Menu Path:** Logistics → Materials Management → Purchasing → Purchase Order → Create → Vendor/Supplying Plant Known
 **Usage:** Primary PO creation (Enjoy screen). Document type NB = standard PO. Header has vendor, purchasing org, currency; items have material, quantity, delivery date, and account assignment.
+**Gotcha:** CRITICAL — To define PO document types (NB, FO, UB, custom), use SPRO T-code **OMH6** (Materials Management ▸ Purchasing ▸ Purchase Order ▸ Define Document Types). OMBA is NOT for purchasing — OMBA is "Number Assignment for Accounting Documents," an FI T-code for accounting document number ranges. Configuring PO types in OMBA is a common and costly navigation error.
 
 ### ME22N — Change Purchase Order
 
