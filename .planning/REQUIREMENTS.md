@@ -48,10 +48,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CO — Controlling
 
-- [ ] **CO-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
-- [ ] **CO-02**: SPRO/IMG configuration paths for cost center accounting, profit center accounting, internal orders, and product costing with step-by-step guidance
-- [ ] **CO-03**: Business process maps for cost allocation and settlement tied to specific transactions and config
-- [ ] **CO-04**: Master data reference covering cost centers, profit centers, internal orders, cost elements, activity types — key fields and relationships
+- [x] **CO-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
+- [x] **CO-02**: SPRO/IMG configuration paths for cost center accounting, profit center accounting, internal orders, and product costing with step-by-step guidance
+- [x] **CO-03**: Business process maps for cost allocation and settlement tied to specific transactions and config
+- [x] **CO-04**: Master data reference covering cost centers, profit centers, internal orders, cost elements, activity types — key fields and relationships
 - [ ] **CO-05**: Cost element mapping and CO-FI reconciliation walkthrough
 - [ ] **CO-06**: Configuration decision trees for common CO scenarios (allocation cycles, settlement rules, transfer pricing)
 - [ ] **CO-07**: Common CO gotchas and troubleshooting guide specific to ECC 6
@@ -135,10 +135,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | SD-06 | Phase 8 | Complete |
 | SD-07 | Phase 8 | Complete |
 | INTG-02 | Phase 8 | Complete |
-| CO-01 | Phase 9 | Pending |
-| CO-02 | Phase 9 | Pending |
-| CO-03 | Phase 9 | Pending |
-| CO-04 | Phase 9 | Pending |
+| CO-01 | Phase 9 | Complete |
+| CO-02 | Phase 9 | Complete |
+| CO-03 | Phase 9 | Complete |
+| CO-04 | Phase 9 | Complete |
 | CO-05 | Phase 10 | Pending |
 | CO-06 | Phase 10 | Pending |
 | CO-07 | Phase 10 | Pending |
