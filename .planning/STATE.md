@@ -43,6 +43,7 @@ Progress: [███████░░░] 74%
 - Trend: Stable ~2-5min per content-writing plan
 
 *Updated after each plan completion*
+| Phase 09 P01 | 4min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Recent decisions affecting current work:
 - Token budget warnings accepted for sd-advanced.md (13459 tokens vs 5000 cap) -- file covers VKOA + decision trees + troubleshooting; same pattern as mm-advanced.md (08-03)
 - CLAUDE.md token budget slightly over (872 vs 600 cap) -- accepted for comprehensive File Index with 6 content file rows (08-03)
 - content_type set to config-spro (not config) to match validate.py expected types (09-03)
+- [Phase 09]: Token budget warning accepted for CO tcodes.md (7600 tokens vs 5000 cap) -- comprehensive reference with 8 subareas; same pattern as SD tcodes.md
+- [Phase 09]: CO-PA limited to 2 T-codes (KE21N, KE24) with explicit Phase 10 deferral
 
 ### Pending Todos
 
@@ -124,5 +127,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 09-03-PLAN.md (CO SPRO configuration reference with 8 sections, 27 T-codes, dependency sequence).
+Stopped at: Completed 09-01-PLAN.md (re-executed: CO tcodes.md with ~63 T-codes across 8 subareas). Plans 09-01 through 09-03 have SUMMARY.md.
 Resume file: None
