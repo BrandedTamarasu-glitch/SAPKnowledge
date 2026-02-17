@@ -168,12 +168,13 @@ Plans:
   2. User can navigate SPRO/IMG configuration for CO with step-by-step paths
   3. Business process maps for cost allocation and settlement tie specific transactions to process steps
   4. Master data reference covers cost centers, profit centers, internal orders, cost elements, activity types with key field explanations
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
-- [ ] 09-03: TBD
+- [ ] 09-01-PLAN.md — CO T-code reference (~63 T-codes across Cost Elements/CCA/Internal Orders/Activity Types/PCA/Product Costing/Period-End/Reporting)
+- [ ] 09-02-PLAN.md — CO master data reference (cost elements CSKA/CSKB, cost centers CSKS, internal orders AUFK, activity types CSLA, profit centers CEPC, CO tables COSP/COSS)
+- [ ] 09-03-PLAN.md — CO SPRO config reference (CA setup, cost elements, CCA, internal orders, activity types, allocation cycles, product costing, PCA)
+- [ ] 09-04-PLAN.md — CO process flows (period-end allocation, internal order settlement, product costing run, cost center planning, period-end closing sequence) + CLAUDE.md update
 
 ### Phase 10: CO Advanced & FI Integration
 **Goal**: Document cost element mapping, CO-FI reconciliation, decision trees, troubleshooting, and complete CO-FI integration point
@@ -241,7 +242,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 6. MM Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
 | 7. SD Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 8. SD Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
-| 9. CO Module Foundation | 0/TBD | Not started | - |
+| 9. CO Module Foundation | 0/4 | Not started | - |
 | 10. CO Advanced & FI Integration | 0/TBD | Not started | - |
 | 11. Cross-Module Integration | 0/TBD | Not started | - |
 | 12. Solution Design Intelligence | 0/TBD | Not started | - |
