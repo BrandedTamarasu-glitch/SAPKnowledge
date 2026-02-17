@@ -68,12 +68,13 @@ Plans:
   2. User can navigate SPRO/IMG configuration for FI with step-by-step paths
   3. Record-to-report business process maps tie specific transactions to process steps
   4. Master data reference covers GL accounts, vendor master, customer master, asset master with key field explanations
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — T-code reference (tcodes.md): 65 verified T-codes across GL/AP/AR/AA with workflow index
+- [ ] 03-02-PLAN.md — Master data reference (master-data.md): SKA1+SKB1, LFA1+LFB1+LFM1, KNA1+KNB1+KNVV, ANLA+ANLB+ANLZ
+- [ ] 03-03-PLAN.md — SPRO config reference (config-spro.md): GL, AP/AR, Asset Accounting (EC08→AFAMA order), New GL
+- [ ] 03-04-PLAN.md — Process flows (processes.md): GL posting cycle, month-end close, F110 payment run, financial reporting; plus CLAUDE.md update
 
 ### Phase 4: FI Advanced & Integration Prep
 **Goal**: Layer on FI account determination logic, decision frameworks, and troubleshooting that enable MM/SD integration in later phases
@@ -232,7 +233,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 |-------|----------------|--------|-----------|
 | 1. Repository Foundation | 4/4 | Complete | 2026-02-16 |
 | 2. Core Reference Framework | 2/2 | Complete | 2026-02-16 |
-| 3. FI Module Foundation | 0/TBD | Not started | - |
+| 3. FI Module Foundation | 0/4 | Not started | - |
 | 4. FI Advanced & Integration Prep | 0/TBD | Not started | - |
 | 5. MM Module Foundation | 0/TBD | Not started | - |
 | 6. MM Advanced & FI Integration | 0/TBD | Not started | - |
