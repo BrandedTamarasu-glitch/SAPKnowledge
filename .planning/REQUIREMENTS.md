@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUND-01**: Always-loaded routing index in `.claude/rules/` that directs Claude to the correct module files based on query context
-- [ ] **FOUND-02**: YAML frontmatter convention applied to every content file (module, ecc_version, confidence, last_verified, ehp_range)
-- [ ] **FOUND-03**: Org structure reference covering company code, plant, storage location, sales org, distribution channel, division, purchasing org, purchasing group, controlling area, and their relationships
-- [ ] **FOUND-04**: ECC 6 vs S/4HANA disambiguation framework with dedicated annotations in every content file calling out behavioral differences
-- [ ] **FOUND-05**: Validation scripts that verify cross-references resolve, YAML frontmatter is present, file sizes stay within token budget, and no S/4HANA-only content leaks in
-- [ ] **FOUND-06**: File/folder structure following module-first organization with child CLAUDE.md files for on-demand loading
+- [x] **FOUND-01**: Always-loaded routing index in `.claude/rules/` that directs Claude to the correct module files based on query context
+- [x] **FOUND-02**: YAML frontmatter convention applied to every content file (module, ecc_version, confidence, last_verified, ehp_range)
+- [x] **FOUND-03**: Org structure reference covering company code, plant, storage location, sales org, distribution channel, division, purchasing org, purchasing group, controlling area, and their relationships
+- [x] **FOUND-04**: ECC 6 vs S/4HANA disambiguation framework with dedicated annotations in every content file calling out behavioral differences
+- [x] **FOUND-05**: Validation scripts that verify cross-references resolve, YAML frontmatter is present, file sizes stay within token budget, and no S/4HANA-only content leaks in
+- [x] **FOUND-06**: File/folder structure following module-first organization with child CLAUDE.md files for on-demand loading
 
 ### FI — Financial Accounting
 
@@ -106,12 +106,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| FOUND-05 | Phase 1 | Pending |
-| FOUND-06 | Phase 1 | Pending |
-| FOUND-03 | Phase 2 | Pending |
-| FOUND-04 | Phase 2 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
+| FOUND-05 | Phase 1 | Complete |
+| FOUND-06 | Phase 1 | Complete |
+| FOUND-03 | Phase 2 | Complete |
+| FOUND-04 | Phase 2 | Complete |
 | FI-01 | Phase 3 | Pending |
 | FI-02 | Phase 3 | Pending |
 | FI-03 | Phase 3 | Pending |
