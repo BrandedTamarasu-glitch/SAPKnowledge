@@ -85,11 +85,11 @@ Plans:
   2. Configuration decision trees guide common FI scenarios (parallel accounting, payment terms, dunning)
   3. Common FI gotchas and troubleshooting guide resolves ECC 6-specific issues
   4. User can answer "what GL account gets debited when MM posts goods receipt" from content
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Account determination reference (account-determination.md): OBYC framework, MM GR/GI walkthrough with worked examples, VKOA framework intro, FI-only auto postings
+- [ ] 04-02-PLAN.md — Decision trees and troubleshooting (fi-advanced.md): 7 decision trees (Q&A + comparison tables), 7 implementation pitfalls, 7 troubleshooting symptoms; CLAUDE.md File Index update
 
 ### Phase 5: MM Module Foundation
 **Goal**: Deliver complete MM reference covering transactions, configuration, processes, and master data for procurement and inventory
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. Repository Foundation | 4/4 | Complete | 2026-02-16 |
 | 2. Core Reference Framework | 2/2 | Complete | 2026-02-16 |
 | 3. FI Module Foundation | 4/4 | Complete | 2026-02-17 |
-| 4. FI Advanced & Integration Prep | 0/TBD | Not started | - |
+| 4. FI Advanced & Integration Prep | 0/2 | Not started | - |
 | 5. MM Module Foundation | 0/TBD | Not started | - |
 | 6. MM Advanced & FI Integration | 0/TBD | Not started | - |
 | 7. SD Module Foundation | 0/TBD | Not started | - |
