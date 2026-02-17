@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Core Reference Framework** - Org structure reference, ECC 6 vs S/4HANA disambiguation
 - [x] **Phase 3: FI Module Foundation** - T-codes, SPRO paths, processes, master data
 - [x] **Phase 4: FI Advanced & Integration Prep** - Account determination, decision trees, troubleshooting
-- [ ] **Phase 5: MM Module Foundation** - T-codes, SPRO paths, processes, master data
+- [x] **Phase 5: MM Module Foundation** - T-codes, SPRO paths, processes, master data
 - [ ] **Phase 6: MM Advanced & FI Integration** - OBYC account determination, decision trees, MM-FI integration
 - [ ] **Phase 7: SD Module Foundation** - T-codes, SPRO paths, processes, master data
 - [ ] **Phase 8: SD Advanced & FI Integration** - VKOA account determination, pricing basics, SD-FI integration
@@ -103,10 +103,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — T-code reference (tcodes.md): ~67 verified T-codes across Purchasing/IM/LIV/MRP with workflow index
-- [ ] 05-02-PLAN.md — Master data reference (master-data.md): material master (all views/tables), vendor master (LFA1/LFB1/LFM1), info records (EINA/EINE), source lists (EORD), 7 CORRECTION blocks
-- [ ] 05-03-PLAN.md — SPRO config reference (config-spro.md): Enterprise Structure, Purchasing, IM, LIV (all 15 tolerance keys), Valuation basics
-- [ ] 05-04-PLAN.md — Process flows (processes.md): P2P with three-way match detail, outline agreements, physical inventory; plus CLAUDE.md module index update
+- [x] 05-01-PLAN.md — T-code reference (tcodes.md): ~67 verified T-codes across Purchasing/IM/LIV/MRP with workflow index
+- [x] 05-02-PLAN.md — Master data reference (master-data.md): material master (all views/tables), vendor master (LFA1/LFB1/LFM1), info records (EINA/EINE), source lists (EORD), 7 CORRECTION blocks
+- [x] 05-03-PLAN.md — SPRO config reference (config-spro.md): Enterprise Structure, Purchasing, IM, LIV (all 15 tolerance keys), Valuation basics
+- [x] 05-04-PLAN.md — Process flows (processes.md): P2P with three-way match detail, outline agreements, physical inventory; plus CLAUDE.md module index update
 
 ### Phase 6: MM Advanced & FI Integration
 **Goal**: Document OBYC account determination, MM decision trees, troubleshooting, and complete MM-FI integration point
