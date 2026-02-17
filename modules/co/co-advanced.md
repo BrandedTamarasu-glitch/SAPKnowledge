@@ -249,3 +249,181 @@ Step 3: Periodic reconciliation posting
 **Configuration prerequisite:** The intercompany GL accounts used by KALC (receivable and payable) must be configured in OKC1 (or SPRO > Controlling > Organization > Define Reconciliation Posting Accounts). Without this configuration, KALC will error.
 
 > **S/4HANA Differences:** The reconciliation ledger is ELIMINATED in S/4HANA. The Universal Journal (ACDOCA) records all CO postings with full FI account assignment, so cross-company-code CO postings automatically create intercompany FI entries in real time. KALC is no longer needed. Additionally, S/4HANA strongly recommends 1:1 controlling area to company code, further reducing cross-CC scenarios. COFIT and COFIS tables are not used in S/4HANA.
+
+---
+
+## Configuration Decision Trees
+
+> Each decision tree has two parts: (1) Q&A routing — answer questions to reach the recommended approach, then (2) a comparison table with config implications and trade-offs. Decision trees include config paths inline (not just pointers to config-spro.md). CO has 10 decision trees (fewer than MM/SD) because CO configuration patterns are more formulaic.
+
+### Decision Tree 1: Assessment vs Distribution
+
+**Q&A Routing:**
+
+- **Q1:** Does the receiver need to see the original cost element breakdown? -> **Yes:** Distribution (KSV5). **No:** Assessment (KSU5) is simpler.
+- **Q2:** Do you need to allocate secondary cost elements (from prior allocations)? -> **Yes:** Assessment only — distribution cannot handle secondary CEs. **No:** Either works.
+- **Q3:** Is performance a concern (high-volume allocations with many cost elements)? -> **Yes:** Assessment creates fewer CO documents (one per receiver, single CE). **No:** Choose based on reporting needs.
+
+**Comparison Table:**
+
+| Approach | When to Use | Config Path | Trade-offs |
+|----------|------------|-------------|------------|
+| Assessment (KSU5) | Administrative overhead (IT, HR, Facilities); receiver doesn't need cost breakdown; secondary CEs need to be allocated | KSU1: create cycle with secondary CE (cat 42); define senders, receivers, basis | Simpler; fewer CO docs; original CE detail LOST on receiver side — receiver sees one line "Overhead Assessed" |
+| Distribution (KSV5) | Production overhead where cost transparency matters; management wants to see sender's cost composition on receiver | KSV1: create cycle; NO secondary CE needed — original CEs preserved | Full cost visibility; more CO line items (one per original CE); CANNOT handle secondary CEs — only primary |
+| Assessment then Distribution (chained) | Some senders have secondary CEs (from prior assessment), others have only primary | Run KSU5 first (handles secondary CEs), then KSV5 (distributes remaining primary CEs) | Most flexible; higher complexity; sequence matters — distribution must run AFTER assessment |
+
+Cross-reference: See `modules/co/processes.md` Section 1 for the assessment vs distribution process walkthrough.
+
+### Decision Tree 2: Allocation Basis Selection
+
+**Q&A Routing:**
+
+- **Q1:** Are allocation ratios known and stable across periods? -> **Yes:** Fixed percentages (simplest). **No:** Use data-driven allocation.
+- **Q2:** Is the allocation basis a non-monetary measure (headcount, square meters, machine hours)? -> **Yes:** Statistical key figures (KB31N). **No:** Use receiver's own cost values.
+- **Q3:** How frequently does the allocation basis change? -> **Rarely:** Fixed values are fine. **Monthly:** Statistical key figures require monthly entry. Consider fixed values with periodic review.
+
+**Comparison Table:**
+
+| Basis Type | When to Use | Config (Cycle Segment) | Trade-offs |
+|------------|------------|------------------------|------------|
+| Fixed percentages | Known, stable ratios (e.g., 60/40 split between two departments) | Segment: allocation type = fixed percentages; enter % per receiver | Simplest; no maintenance; inaccurate if actual ratios change |
+| Fixed amounts | Absolute allocation per receiver (e.g., fixed monthly charge) | Segment: allocation type = fixed amounts; enter EUR per receiver | Predictable cost allocation; not responsive to volume changes |
+| Statistical key figures (KB31N) | Data-driven allocation (headcount, sq meters, machine hours) | Segment: allocation type = posted amounts with SKF; enter values via KB31N | Most accurate; requires monthly SKF entry (KB31N); more maintenance |
+| Variable portions (receiver's own values) | Receiver's actual costs determine share of allocation | Segment: allocation type = variable portions; system reads receiver balances | Fully dynamic; no separate data entry; circular dependency risk if receivers also send |
+
+### Decision Tree 3: Iterative vs Non-Iterative Allocation
+
+**Q&A Routing:**
+
+- **Q1:** Do any sender cost centers also receive allocations from other senders? -> **No:** Non-iterative (standard). **Yes:** Continue.
+- **Q2:** Is this a reciprocal service situation (A allocates to B, B allocates to A)? -> **Yes:** Iterative allocation needed. **No:** Reorder cycles so senders run before receivers — non-iterative may work.
+- **Q3:** How many cost centers are involved in circular allocations? -> **2-3:** Iterative is manageable. **5+:** Consider simplifying the allocation model or consolidating service cost centers.
+
+**Comparison Table:**
+
+| Approach | When to Use | Config | Trade-offs |
+|----------|------------|--------|------------|
+| Non-iterative (standard) | No circular allocations; each cycle runs once; sender balance goes to zero | Default — no special config | Simplest; fastest; sender balance fully allocated in one pass |
+| Iterative | Reciprocal services (IT charges HR, HR charges IT); circular dependency | Cycle header: Iterative flag = X in KSU1/KSV1; system iterates until convergence (delta < threshold) | Handles circular allocations correctly; slower execution; must define convergence threshold; limited to ~50 iterations in standard SAP |
+| Simplify (avoid iteration) | Complex circular allocations making iteration slow or hard to audit | Restructure CC hierarchy: merge reciprocal CCs or designate one as "primary sender" | Avoids iteration complexity; may sacrifice some allocation accuracy; simpler to audit |
+
+### Decision Tree 4: Settlement Rule Design
+
+**Q&A Routing:**
+
+- **Q1:** Does the order collect costs that should be redistributed to operational cost centers? -> **Yes:** Settle to cost center (CTR) — CO-internal, no FI document.
+- **Q2:** Does the order collect costs that should be capitalized as an asset? -> **Yes:** Settle to fixed asset or AUC (FXA) — creates FI document (capitalization).
+- **Q3:** Should settlement create an FI document (post to a GL account)? -> **Yes:** Use receiver type KST (GL account) with category 22 CE. **No:** Use CTR, ORD, PSP, or RKS (all CO-internal).
+
+**Comparison Table:**
+
+| Receiver Type | COBRB-KONTY | When to Use | Creates FI Document? | Settlement CE |
+|---------------|-------------|-------------|---------------------|---------------|
+| Cost Center | CTR | Redistribute overhead costs to operational CCs | No (CO-internal) | Category 21 (internal) |
+| Internal Order | ORD | Chain settlement (order to order) | No (CO-internal) | Category 21 |
+| GL Account | KST | Close order to P&L/BS account; need FI visibility | Yes — category 22 CE creates FI doc | Category 22 (external) |
+| Fixed Asset / AUC | FXA | Capitalize investment order costs as fixed asset | Yes — creates asset posting | Category 22 |
+| WBS Element | PSP | Project system integration | No (CO-internal) | Category 21 |
+| CO-PA Segment | RKS | Profitability analysis allocation | No (CO-internal) | Category 21 |
+
+> **CRITICAL:** Category 21 (internal settlement) vs category 22 (external settlement) is the key distinction. Only category 22 creates FI documents. The settlement profile (OKO7) controls which receiver types are allowed, and the allocation structure (OKO6) maps source CEs to settlement CEs. See `modules/co/config-spro.md` Section 4.
+
+### Decision Tree 5: Order Type Configuration
+
+**Q&A Routing:**
+
+- **Q1:** What is the purpose of this order type? -> **Overhead tracking:** standard overhead order. **Capital investment:** investment order (settlement to asset). **Accrual:** accrual order (periodic offsetting).
+- **Q2:** Does the order need budgeting (commitment management)? -> **Yes:** Configure budget profile in the order type (KOT2). **No:** Skip budgeting.
+- **Q3:** Should settlement rules be mandatory at order creation? -> **Yes (recommended):** Configure settlement profile (OKO7) to require settlement rule. **No:** Settlement rules can be added later, but risk missing them at period-end.
+
+**Comparison Table:**
+
+| Order Type Pattern | Example AUART | Settlement Profile | Budget Profile | Use Case |
+|-------------------|---------------|-------------------|----------------|----------|
+| Overhead order | 0100 | Allows CTR, KST receivers; settlement optional | None | Marketing campaigns, repairs, temporary cost collection |
+| Investment order | 0200 | Requires FXA receiver; settlement mandatory | Budget profile active | Capital projects; costs capitalized as fixed asset at settlement |
+| Accrual order | 0300 | Specific accrual settlement profile | None | Periodic accruals with offsetting entries |
+| Statistical order (reporting only) | 0400 | No settlement — order is statistical (costs posted in parallel, not instead of) | None | Track costs for reporting without moving them; actual costs remain on the cost center |
+
+### Decision Tree 6: Cost Center Hierarchy Design
+
+**Q&A Routing:**
+
+- **Q1:** What organizational structure should the hierarchy mirror? -> Typically: Company > Division/Business Unit > Department > Team/Function. The standard hierarchy (OKEON) must contain ALL cost centers.
+- **Q2:** How deep should the hierarchy go? -> 3-4 levels is standard. More than 5 levels = maintenance overhead and reporting complexity.
+- **Q3:** Do you need alternative groupings for reporting beyond the standard hierarchy? -> **Yes:** Create additional cost center groups (KSH1) for cross-departmental reporting. **No:** Standard hierarchy is sufficient.
+
+**Comparison Table:**
+
+| Approach | When to Use | Config Path | Trade-offs |
+|----------|------------|-------------|------------|
+| Flat hierarchy (2-3 levels) | Small organization; few cost centers (<100) | OKEON: root > department > cost centers | Simplest maintenance; limited drill-down in reports |
+| Standard hierarchy (3-4 levels) | Medium-to-large org; clear departmental structure | OKEON: root > division > department > team > cost centers | Good balance of detail and maintainability; covers most reporting needs |
+| Deep hierarchy (5+ levels) with groups | Large org; need multiple reporting dimensions | OKEON: deep standard hierarchy + KSH1 alternative groups | Maximum reporting flexibility; high maintenance; must keep KSH1 groups in sync |
+
+### Decision Tree 7: Controlling Area to Company Code Relationship
+
+**Q&A Routing:**
+
+- **Q1:** Does the business need cross-company-code cost allocations in CO? -> **No:** Use 1:1 CA to CC (recommended, simpler, S/4HANA ready). **Yes:** Continue.
+- **Q2:** Do all company codes share the same chart of accounts and fiscal year variant? -> **No:** Cannot share a controlling area — 1:1 is mandatory. **Yes:** 1:many is possible.
+- **Q3:** Is S/4HANA migration planned within 3-5 years? -> **Yes:** Use 1:1 even if cross-CC allocation is desired (reduces migration complexity). **No:** 1:many is acceptable if cross-CC allocation is genuinely needed.
+
+**Comparison Table:**
+
+| Relationship | When to Use | Config Path | Trade-offs |
+|-------------|------------|-------------|------------|
+| 1:1 (recommended) | Single company code; or S/4HANA migration planned; no cross-CC allocation needed | OKKP: one CA per CC; OX19: one CC assigned | Simplest; no reconciliation ledger needed; S/4HANA ready; cannot allocate costs across company codes in CO |
+| 1:many | Cross-company-code cost allocations required; shared chart of accounts and FY variant | OKKP: one CA spanning multiple CCs; OX19: multiple CCs assigned; cross-CC indicator active | Enables cross-CC allocations; requires reconciliation ledger (KALC); adds period-end complexity; S/4HANA migration is harder |
+
+> **S/4HANA readiness:** S/4HANA strongly recommends 1:1. If you implement 1:many in ECC 6, plan for migration effort to split the controlling area or reorganize company codes.
+
+### Decision Tree 8: Activity Price Determination
+
+**Q&A Routing:**
+
+- **Q1:** Can the cost center manager reliably estimate activity prices for the fiscal year? -> **Yes:** Manual price entry (KP26) with price indicator 2. **No:** Continue.
+- **Q2:** Should the system calculate planned prices from planned costs and planned activity quantities? -> **Yes:** Automatic price (price indicator 1). The system divides total planned CC costs by planned activity output.
+- **Q3:** Should actual prices replace planned prices for allocation valuation? -> **Yes:** Use price indicator 3 (target = actual). Run KSII at period-end to calculate actual rates.
+
+**Comparison Table:**
+
+| Price Indicator (CSLA-TARKZ) | Name | When to Use | Config | Trade-offs |
+|------------------------------|------|-------------|--------|------------|
+| 1 | Plan price automatic | System calculates from planned costs / planned activity | KP06 (plan costs) + KP26 (plan activity qty); system computes price | No manual price entry; accurate if plan costs and quantities are reliable; recalculates when plan data changes |
+| 2 | Plan price manual | Manager sets activity rate directly | KP26: enter fixed + variable price per unit | Full control; commonly used; requires manager judgment; may not reflect actual cost structure |
+| 3 | Target = actual | Actual costs determine activity price retroactively | KSII at period-end calculates actual price | Most accurate for cost reporting; introduces variance between plan and actual rates; actual price only known at period-end |
+
+### Decision Tree 9: CO Version Strategy
+
+**Q&A Routing:**
+
+- **Q1:** Do you need only one plan for comparison against actuals? -> **Yes:** Use version 0 only (plan/actual integration version). This covers 90% of implementations.
+- **Q2:** Do you need scenario planning (best case, worst case, budget vs forecast)? -> **Yes:** Create additional versions (001, 002, etc.) for scenarios. These hold plan data only — actuals always post to version 0.
+- **Q3:** How many planning scenarios does management need? -> **1-2 scenarios:** manageable. **3+:** consider whether the complexity provides enough value.
+
+**Comparison Table:**
+
+| Strategy | When to Use | Config (OKEQ) | Trade-offs |
+|----------|------------|----------------|------------|
+| Version 0 only | Single plan vs actual comparison; budget = plan | OKEQ: version 0 configured for plan and actual | Simplest; one plan to maintain; covers most reporting needs; no scenario analysis |
+| Version 0 + 1 (budget + forecast) | Separate budget (annual, locked) and forecast (rolling, updated) | OKEQ: version 0 = budget, version 001 = rolling forecast | Common pattern; two plans to maintain; enables budget-vs-forecast-vs-actual three-way comparison |
+| Version 0 + multiple (scenarios) | Complex planning with what-if analysis | OKEQ: version 0 + 001-00N per scenario | Maximum planning flexibility; high maintenance; each version requires full planning data entry |
+
+### Decision Tree 10: Transfer Pricing Approach
+
+**Q&A Routing:**
+
+- **Q1:** Does the business need management reporting at profit centers with internal markup for goods/services transferred between profit centers? -> **No:** Skip PCA transfer pricing — most implementations do not use it. **Yes:** Continue.
+- **Q2:** Should transfer prices affect FI (legal books)? -> **No (standard ECC 6):** PCA transfer pricing updates GLPCA only, not FI. **Yes:** Use intercompany billing (SD module) instead — not PCA transfer pricing.
+- **Q3:** What transfer pricing method? -> Percentage markup on cost, fixed price per unit, or standard cost + markup. Configure in 3KEH.
+
+**Comparison Table:**
+
+| Approach | When to Use | Config Path | Trade-offs |
+|----------|------------|-------------|------------|
+| No transfer pricing | Most implementations; no internal markup needed for management reporting | No config needed | Simplest; profit centers show costs at actual; no dual valuation |
+| PCA transfer pricing (1KEG) | Need profit center reports showing internal margin; dual valuation (legal vs management) | 3KEH: define methods; 1KEG: execute transfer pricing; GLPCA updated | PCA-only (does not affect FI); enables profit center P&L with internal margin; adds period-end step; uncommon — most implementations skip this |
+| Intercompany billing (SD) | Transfer prices must appear in FI (legal books); intercompany invoices required | SD intercompany billing (IV/PI/PD condition types); creates FI documents | FI-visible; legally recognized; much more complex; requires SD master data and billing |
+
+> **S/4HANA Note:** PCA transfer pricing via 1KEG still works in S/4HANA, but the PCA separate ledger is eliminated. Transfer pricing uses the Universal Journal with additional valuation views.
