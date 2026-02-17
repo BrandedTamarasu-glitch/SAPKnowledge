@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 8 in progress — SD Advanced & FI Integration (plan 02 of 3 complete).
+**Current focus:** Phase 8 complete — SD Advanced & FI Integration (all 3 plans). Ready for Phase 9.
 
 ## Current Position
 
-Phase: 8 of 12 (SD Advanced & FI Integration)
-Plan: 2 of 3 in Phase 8
-Status: 08-01 complete (VKOA walkthrough), 08-02 complete (SD-FI integration)
-Last activity: 2026-02-17 — Completed 08-02-PLAN.md (SD-FI integration: 14-entry catalog, VF01 trace, PGI COGS trace, revenue recognition, period-end)
+Phase: 8 of 12 (SD Advanced & FI Integration) -- COMPLETE
+Plan: 3 of 3 in Phase 8
+Status: 08-01 complete (VKOA walkthrough), 08-02 complete (SD-FI integration), 08-03 complete (decision trees + troubleshooting)
+Last activity: 2026-02-17 — Completed 08-03-PLAN.md (12 SD decision trees, 12 troubleshooting entries, CLAUDE.md index update)
 
-Progress: [██████░░░░] 64%
+Progress: [██████░░░░] 67%
 
-(25 known plans have SUMMARY.md)
+(26 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7 + 2 Phase 8)
+- Total plans completed: 26 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7 + 3 Phase 8)
 - Average duration: ~2min
 - Total execution time: ~0.7 hours
 
@@ -36,10 +36,10 @@ Progress: [██████░░░░] 64%
 | 05-mm-module-foundation | 4 (complete) | ~8min | ~2min |
 | 06-mm-advanced-and-fi-integration | 3 (complete) | ~14min | ~4.7min |
 | 07-sd-module-foundation | 4 (complete) | ~11min | ~2.8min |
-| 08-sd-advanced-and-fi-integration | 2 of 3 | ~5min | ~2.5min |
+| 08-sd-advanced-and-fi-integration | 3 (complete) | ~10min | ~3.3min |
 
 **Recent Trend:**
-- Last 5 plans: 07-02 (2min), 07-03 (3min), 07-04 (4min), 08-01 (2min), 08-02 (3min)
+- Last 5 plans: 07-03 (3min), 07-04 (4min), 08-01 (2min), 08-02 (3min), 08-03 (5min)
 - Trend: Stable ~2-5min per content-writing plan
 
 *Updated after each plan completion*
@@ -109,6 +109,8 @@ Recent decisions affecting current work:
 - Pro forma billing (F5/F8) explicitly marked as No FI posting in integration catalog (08-02)
 - Period-end sequence as 7-step table paralleling MM-FI period-end format (08-02)
 - Revenue recognition kept at moderate depth; complex POC deferred to Phase 12 (08-02)
+- Token budget warnings accepted for sd-advanced.md (13459 tokens vs 5000 cap) -- file covers VKOA + decision trees + troubleshooting; same pattern as mm-advanced.md (08-03)
+- CLAUDE.md token budget slightly over (872 vs 600 cap) -- accepted for comprehensive File Index with 6 content file rows (08-03)
 
 ### Pending Todos
 
@@ -121,5 +123,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 08-02-PLAN.md (SD-FI integration: 14-entry catalog, VF01 5-step trace, PGI COGS 3-step trace, revenue recognition, 7-step period-end sequence). Phase 8 plan 2 of 3 complete.
+Stopped at: Completed 08-03-PLAN.md (12 SD decision trees, 12 troubleshooting entries, CLAUDE.md index update). Phase 8 complete (all 3 plans).
 Resume file: None
