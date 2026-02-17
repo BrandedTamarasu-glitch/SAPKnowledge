@@ -100,12 +100,13 @@ Plans:
   2. User can navigate SPRO/IMG configuration for MM with step-by-step paths
   3. Procure-to-pay business process maps tie specific transactions to process steps
   4. Master data reference covers material master, vendor master, purchasing info records, source lists with key field explanations
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md — T-code reference (tcodes.md): ~67 verified T-codes across Purchasing/IM/LIV/MRP with workflow index
+- [ ] 05-02-PLAN.md — Master data reference (master-data.md): material master (all views/tables), vendor master (LFA1/LFB1/LFM1), info records (EINA/EINE), source lists (EORD), 7 CORRECTION blocks
+- [ ] 05-03-PLAN.md — SPRO config reference (config-spro.md): Enterprise Structure, Purchasing, IM, LIV (all 15 tolerance keys), Valuation basics
+- [ ] 05-04-PLAN.md — Process flows (processes.md): P2P with three-way match detail, outline agreements, physical inventory; plus CLAUDE.md module index update
 
 ### Phase 6: MM Advanced & FI Integration
 **Goal**: Document OBYC account determination, MM decision trees, troubleshooting, and complete MM-FI integration point
