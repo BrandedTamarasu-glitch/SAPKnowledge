@@ -25,3 +25,5 @@ Client (Mandt)
 - Sales Org → Company Code (many:1)
 - Purchasing Org → Company Code (many:1) or Plant (many:1)
 - Controlling Area → Company Code (1:many)
+
+For full detail (fields, T-codes, cardinality, S/4 differences): `reference/org-structure.md`
