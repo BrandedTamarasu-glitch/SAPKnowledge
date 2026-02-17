@@ -116,9 +116,9 @@ Requirements for initial release. Each maps to roadmap phases.
 | FI-02 | Phase 3 | Complete |
 | FI-03 | Phase 3 | Complete |
 | FI-04 | Phase 3 | Complete |
-| FI-05 | Phase 4 | Pending |
-| FI-06 | Phase 4 | Pending |
-| FI-07 | Phase 4 | Pending |
+| FI-05 | Phase 4 | Complete |
+| FI-06 | Phase 4 | Complete |
+| FI-07 | Phase 4 | Complete |
 | MM-01 | Phase 5 | Pending |
 | MM-02 | Phase 5 | Pending |
 | MM-03 | Phase 5 | Pending |
