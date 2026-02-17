@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 8 in progress — SD Advanced & FI Integration (plan 01 of 3 complete).
+**Current focus:** Phase 8 in progress — SD Advanced & FI Integration (plan 02 of 3 complete).
 
 ## Current Position
 
 Phase: 8 of 12 (SD Advanced & FI Integration)
-Plan: 1 of 3 in Phase 8
-Status: 08-01 complete (VKOA walkthrough)
-Last activity: 2026-02-17 — Completed 08-01-PLAN.md (VKOA walkthrough: dual-axis reference, pricing-to-VKOA chain, 8 worked examples, debugging path)
+Plan: 2 of 3 in Phase 8
+Status: 08-01 complete (VKOA walkthrough), 08-02 complete (SD-FI integration)
+Last activity: 2026-02-17 — Completed 08-02-PLAN.md (SD-FI integration: 14-entry catalog, VF01 trace, PGI COGS trace, revenue recognition, period-end)
 
-Progress: [██████░░░░] 62%
+Progress: [██████░░░░] 64%
 
-(24 known plans have SUMMARY.md)
+(25 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7 + 1 Phase 8)
+- Total plans completed: 25 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7 + 2 Phase 8)
 - Average duration: ~2min
 - Total execution time: ~0.7 hours
 
@@ -36,10 +36,10 @@ Progress: [██████░░░░] 62%
 | 05-mm-module-foundation | 4 (complete) | ~8min | ~2min |
 | 06-mm-advanced-and-fi-integration | 3 (complete) | ~14min | ~4.7min |
 | 07-sd-module-foundation | 4 (complete) | ~11min | ~2.8min |
-| 08-sd-advanced-and-fi-integration | 1 of 3 | ~2min | ~2min |
+| 08-sd-advanced-and-fi-integration | 2 of 3 | ~5min | ~2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 07-01 (~2min), 07-02 (2min), 07-03 (3min), 07-04 (4min), 08-01 (2min)
+- Last 5 plans: 07-02 (2min), 07-03 (3min), 07-04 (4min), 08-01 (2min), 08-02 (3min)
 - Trend: Stable ~2-5min per content-writing plan
 
 *Updated after each plan completion*
@@ -105,6 +105,10 @@ Recent decisions affecting current work:
 - VKOA content placed in sd-advanced.md (not fi/account-determination.md) to keep SD perspective separate from FI framework (08-01)
 - EVV documented with both VKOA and OBXI paths since implementation choice varies (08-01)
 - Intercompany billing kept at foundation level with explicit Phase 12 deferral for deep IV/PI/PD config (08-01)
+- VKOA vs OBYC independence documented as CRITICAL DISTINCTION -- prevents the #1 SD-FI confusion (08-02)
+- Pro forma billing (F5/F8) explicitly marked as No FI posting in integration catalog (08-02)
+- Period-end sequence as 7-step table paralleling MM-FI period-end format (08-02)
+- Revenue recognition kept at moderate depth; complex POC deferred to Phase 12 (08-02)
 
 ### Pending Todos
 
@@ -117,5 +121,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 08-01-PLAN.md (VKOA walkthrough: 304 lines, dual-axis reference, 8 worked examples, debugging path). Phase 8 plan 1 of 3 complete.
+Stopped at: Completed 08-02-PLAN.md (SD-FI integration: 14-entry catalog, VF01 5-step trace, PGI COGS 3-step trace, revenue recognition, 7-step period-end sequence). Phase 8 plan 2 of 3 complete.
 Resume file: None
