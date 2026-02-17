@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 7 complete — SD Module Foundation (all 4 plans done). Ready for Phase 8.
+**Current focus:** Phase 8 in progress — SD Advanced & FI Integration (plan 01 of 3 complete).
 
 ## Current Position
 
-Phase: 7 of 12 (SD Module Foundation) — COMPLETE
-Plan: 4 of 4 in Phase 7 (all complete)
-Status: 07-01 complete (tcodes), 07-02 complete (master-data), 07-03 complete (config-spro), 07-04 complete (processes)
-Last activity: 2026-02-17 — Completed 07-04-PLAN.md (SD processes: standard O2C, returns, credit/debit memos, cash sales, rush orders, consignment, third-party)
+Phase: 8 of 12 (SD Advanced & FI Integration)
+Plan: 1 of 3 in Phase 8
+Status: 08-01 complete (VKOA walkthrough)
+Last activity: 2026-02-17 — Completed 08-01-PLAN.md (VKOA walkthrough: dual-axis reference, pricing-to-VKOA chain, 8 worked examples, debugging path)
 
-Progress: [██████░░░░] 58%
+Progress: [██████░░░░] 62%
 
-(23 known plans have SUMMARY.md)
+(24 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7)
+- Total plans completed: 24 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6 + 4 Phase 7 + 1 Phase 8)
 - Average duration: ~2min
 - Total execution time: ~0.7 hours
 
@@ -36,9 +36,10 @@ Progress: [██████░░░░] 58%
 | 05-mm-module-foundation | 4 (complete) | ~8min | ~2min |
 | 06-mm-advanced-and-fi-integration | 3 (complete) | ~14min | ~4.7min |
 | 07-sd-module-foundation | 4 (complete) | ~11min | ~2.8min |
+| 08-sd-advanced-and-fi-integration | 1 of 3 | ~2min | ~2min |
 
 **Recent Trend:**
-- Last 5 plans: 06-03 (5min), 07-01 (~2min), 07-02 (2min), 07-03 (3min), 07-04 (4min)
+- Last 5 plans: 07-01 (~2min), 07-02 (2min), 07-03 (3min), 07-04 (4min), 08-01 (2min)
 - Trend: Stable ~2-5min per content-writing plan
 
 *Updated after each plan completion*
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - Credit/debit memo sections expanded with summary tables for self-contained reference (07-04)
 - Cash sales documented as 5-step automatic process (order+delivery+PGI+billing+FI simultaneous) (07-04)
 - CLAUDE.md token budget slightly over (720 vs 600 cap) — accepted for comprehensive File Index guidance across 4 content files (07-04)
+- VKOA content placed in sd-advanced.md (not fi/account-determination.md) to keep SD perspective separate from FI framework (08-01)
+- EVV documented with both VKOA and OBXI paths since implementation choice varies (08-01)
+- Intercompany billing kept at foundation level with explicit Phase 12 deferral for deep IV/PI/PD config (08-01)
 
 ### Pending Todos
 
@@ -113,5 +117,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 07-04-PLAN.md (SD processes: 7 variants, 260 lines, document flow reference, CLAUDE.md updated). Phase 7 complete (all 4 plans done).
+Stopped at: Completed 08-01-PLAN.md (VKOA walkthrough: 304 lines, dual-axis reference, 8 worked examples, debugging path). Phase 8 plan 1 of 3 complete.
 Resume file: None
