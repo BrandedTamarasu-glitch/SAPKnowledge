@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 ## Current Position
 
-Phase: 3 of 12 (FI Module Foundation) — In progress
-Plan: 3 of 4 in Phase 3
-Status: 03-01 (FI T-codes), 03-02 (FI master data), and 03-03 (FI SPRO config) complete; 03-04 remaining
-Last activity: 2026-02-17 — Completed 03-03-PLAN.md (FI SPRO config: 27 steps across GL/AP-AR/AA/New GL)
+Phase: 3 of 12 (FI Module Foundation) — Phase complete
+Plan: 4 of 4 in Phase 3
+Status: All four Phase 3 plans complete (03-01 T-codes, 03-02 master data, 03-03 SPRO config, 03-04 processes)
+Last activity: 2026-02-17 — Completed 03-04-PLAN.md (FI processes: 4 process flows, 176 lines; CLAUDE.md updated)
 
-Progress: [████░░░░░░] 28%
+Progress: [████░░░░░░] 31%
 
-(3 of 12 phases partially complete; 9 known plans have SUMMARY.md)
+(Phase 3 complete; 10 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9 (4 Phase 1 + 2 Phase 2 + 3 Phase 3)
+- Total plans completed: 10 (4 Phase 1 + 2 Phase 2 + 4 Phase 3)
 - Average duration: ~2min
 - Total execution time: ~0.4 hours
 
@@ -31,10 +31,10 @@ Progress: [████░░░░░░] 28%
 |-------|-------|-------|----------|
 | 01-repository-foundation | 4 | ~12min | ~3min |
 | 02-core-reference-framework | 2 | ~5min | ~2.5min |
-| 03-fi-module-foundation | 3 (of 4) | ~7min | ~2.3min |
+| 03-fi-module-foundation | 4 (complete) | ~9min | ~2.3min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 rerun (2min), 03-01 (3min), 03-02 (2min), 03-03 (2min)
+- Last 5 plans: 03-01 (3min), 03-02 (2min), 03-03 (2min), 03-04 (2min)
 - Trend: Stable ~2min per content-writing plan
 
 *Updated after each plan completion*
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - AA config order (EC08→OAOB→OAOA→AO90→AFAMA) documented at section header with CRITICAL warning — most dangerous FI config mistake (03-03)
 - FBZP 5 sub-areas under one step (not 5 steps) — reflects how consultants describe FBZP in practice (03-03)
 - Document splitting client-level warning uses CRITICAL callout; per-CC deactivation path included (03-03)
+- processes.md uses narrative-plus-table format with role annotations at each step (03-04)
+- Cross-references embedded inline: FBZP→config-spro.md, S_ALR confusion warning, AFAB→AJAB dependency (03-04)
+- CLAUDE.md File Index updated to specific Read When guidance (not generic) for all four Phase 3 files (03-04)
 
 ### Pending Todos
 
@@ -84,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 03-03-PLAN.md (FI SPRO config reference, 27 steps, 314 lines). Phase 3 plan 3 of 4 done.
+Stopped at: Completed 03-04-PLAN.md (FI processes: 4 process flows, 176 lines). Phase 3 complete (all 4 plans done).
 Resume file: None
