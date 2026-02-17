@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 7 in progress — SD Module Foundation (07-03 complete, 07-04 next).
+**Current focus:** Phase 7 complete — SD Module Foundation (all 4 plans done). Ready for Phase 8.
 
 ## Current Position
 
-Phase: 7 of 12 (SD Module Foundation) — IN PROGRESS
-Plan: 3 of 4 in Phase 7 (07-01 complete, 07-02 complete, 07-03 complete)
-Status: 07-01 complete (tcodes), 07-02 complete (master-data), 07-03 complete (config-spro)
-Last activity: 2026-02-17 — Completed 07-03-PLAN.md (SD SPRO config: 8 sections, condition technique, copy control, item category determination)
+Phase: 7 of 12 (SD Module Foundation) — COMPLETE
+Plan: 4 of 4 in Phase 7 (all complete)
+Status: 07-01 complete (tcodes), 07-02 complete (master-data), 07-03 complete (config-spro), 07-04 complete (processes)
+Last activity: 2026-02-17 — Completed 07-04-PLAN.md (SD processes: standard O2C, returns, credit/debit memos, cash sales, rush orders, consignment, third-party)
 
-Progress: [██████░░░░] 56%
+Progress: [██████░░░░] 58%
 
-(22 known plans have SUMMARY.md)
+(23 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
@@ -96,6 +96,8 @@ Recent decisions affecting current work:
 - Condition technique documented once in Pricing section, referenced by Output Determination and Text Determination — avoids duplication (07-03)
 - Credit management kept at foundation level (5-step brief) with explicit deferral to Phase 8 (07-03)
 - VKOA revenue account determination kept as brief framework entry point, deferring deep-dive to Phase 8 (07-03)
+- Token budget warning accepted for SD tcodes.md (7100 tokens vs 5000 cap) — comprehensive reference with condition technique overview; same pattern as mm-advanced.md (07-01)
+- Batch Determination included at foundation level (VLBR, MBC1, CL20N) — batch traceability is daily-use (07-01)
 
 ### Pending Todos
 
@@ -108,5 +110,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 07-03-PLAN.md (SD SPRO config: 8 sections, condition technique 4-layer model, copy control VTAA/VTLA/VTFL/VTAF, OVLP item category determination, OVKK pricing procedure determination).
+Stopped at: Re-executed 07-01-PLAN.md (SD tcodes.md: 583 lines, 83 T-code entries, 12 submodule sections, condition technique overview). All Phase 7 plans complete.
 Resume file: None
