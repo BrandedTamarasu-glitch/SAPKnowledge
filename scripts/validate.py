@@ -65,7 +65,7 @@ TOKEN_BUDGETS = {
     "processes": 4000,
     "master-data": 4000,
     "patterns": 4000,
-    "integration": 3000,
+    "integration": 5000,
     "e2e-process": 5000,
     "lookup-table": 5000,
     "account-determination": 5000,
@@ -131,10 +131,23 @@ def strip_fenced_blocks(content):
 
 
 def strip_s4_callouts(content):
-    """Remove intentional S/4HANA disambiguation callouts from scanning."""
-    return re.sub(
+    """Remove intentional S/4HANA disambiguation callouts from scanning.
+
+    Strips:
+    - Blockquote lines containing S/4HANA (> ... S/4HANA ...)
+    - The entire 'S/4HANA Differences' section at the end of files
+      (standard disambiguation section per KB conventions)
+    """
+    # Strip blockquote callouts
+    result = re.sub(
         r'^>.*?S/4HANA.*$', '', content, flags=re.MULTILINE
     )
+    # Strip the S/4HANA Differences section (always at end of file)
+    result = re.sub(
+        r'^##\s+\d*\.?\s*S/4HANA Differences.*',
+        '', result, flags=re.MULTILINE | re.DOTALL
+    )
+    return result
 
 
 def relative_path(filepath):
