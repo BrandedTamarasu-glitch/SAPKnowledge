@@ -131,10 +131,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | SD-02 | Phase 7 | Complete |
 | SD-03 | Phase 7 | Complete |
 | SD-04 | Phase 7 | Complete |
-| SD-05 | Phase 8 | Pending |
-| SD-06 | Phase 8 | Pending |
-| SD-07 | Phase 8 | Pending |
-| INTG-02 | Phase 8 | Pending |
+| SD-05 | Phase 8 | Complete |
+| SD-06 | Phase 8 | Complete |
+| SD-07 | Phase 8 | Complete |
+| INTG-02 | Phase 8 | Complete |
 | CO-01 | Phase 9 | Pending |
 | CO-02 | Phase 9 | Pending |
 | CO-03 | Phase 9 | Pending |
