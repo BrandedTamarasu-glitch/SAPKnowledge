@@ -427,3 +427,121 @@ Cross-reference: See `modules/co/processes.md` Section 1 for the assessment vs d
 | Intercompany billing (SD) | Transfer prices must appear in FI (legal books); intercompany invoices required | SD intercompany billing (IV/PI/PD condition types); creates FI documents | FI-visible; legally recognized; much more complex; requires SD master data and billing |
 
 > **S/4HANA Note:** PCA transfer pricing via 1KEG still works in S/4HANA, but the PCA separate ledger is eliminated. Transfer pricing uses the Universal Journal with additional valuation views.
+
+---
+
+## Troubleshooting — Symptom-Based Diagnosis
+
+> Organized by what the user sees (error message, zero allocation, wrong posting, reconciliation gap). Each entry is self-contained: symptom + root cause + full resolution path inline. SAP message classes included for searchability. Diagnostic T-codes referenced in each resolution. OKB9 error is entry #1 — the single most common CO error.
+
+### Symptom 1: "Enter a CO Account Assignment" When Posting FI Document
+
+**SAP Messages:** KI class errors; "Enter a CO account assignment for G/L account..."
+**Symptom:** FI posting (FB50, FB60, MIRO, or any transaction posting to a P&L GL account) fails with a message demanding a cost center, internal order, or other CO object.
+**Root Cause:** The P&L GL account has a corresponding primary cost element (CSKB), but no CO account assignment is on the FI document line item, and OKB9 has no default for this GL account/company code combination. This is the #1 CO error for new implementations and ongoing operations.
+**Resolution:**
+1. **Immediate fix:** Re-enter the FI posting with a cost center or internal order on the line item
+2. **Preventive fix:** Maintain OKB9 — set a default cost center for the GL account and company code. Future postings without a manual CO assignment will use the OKB9 default.
+3. **Check cost element:** KA03 — verify the cost element exists for the GL account. If the GL account should NOT flow to CO (rare for P&L accounts), do not create a cost element for it.
+4. **Verify OKB9 coverage:** Review all P&L GL accounts that have cost elements and ensure OKB9 defaults exist for each. Missing OKB9 entries are the root cause of this error.
+
+Cross-reference: See `modules/co/config-spro.md` Section 2.1 for OKB9 configuration details.
+
+### Symptom 2: FI Posting Succeeds but Cost Center Is Wrong in CO
+
+**SAP Messages:** No error — posting succeeds, but KSB1 shows costs on a catch-all or wrong cost center.
+**Symptom:** OKB9 default assigns costs to a generic catch-all cost center instead of the correct operational cost center. Users rely on the default instead of entering the specific CC.
+**Root Cause:** OKB9 has a blanket default cost center that catches all postings without manual CO assignment. Users are not trained to enter the correct cost center on FI postings.
+**Resolution:**
+1. **Correct the posting:** KB61 (reposting of CO line items) — move the cost from the wrong CC to the correct CC. Run KB61 BEFORE period-end allocations.
+2. **Improve OKB9 defaults:** Where possible, set OKB9 defaults at a more granular level (specific GL account + company code combinations) rather than blanket defaults.
+3. **Train users:** Educate FI users to enter the correct cost center on P&L postings, not rely on OKB9 defaults.
+4. **Reporting check:** Run KSB1 for the catch-all cost center at period start to identify and repost mis-assigned costs early.
+
+### Symptom 3: Assessment/Distribution Cycle Runs but Posts Zero
+
+**SAP Messages:** No error — cycle executes successfully but allocation amount = 0.
+**Symptom:** KSU5 or KSV5 runs without errors but creates no CO documents. Sender cost centers show no allocation postings.
+**Root Cause:** Sender cost centers have no balance for the cost elements included in the cycle. Either costs have not yet been posted for the period, or the cost element range in the cycle segment does not match the actual posted cost elements.
+**Resolution:**
+1. **Verify sender balances:** KSB1 for sender cost centers — filter by the period and check if actual costs exist
+2. **Check cycle cost elements:** KSU2/KSV2 — review the sender values configuration. Are the cost element groups or individual CEs in the cycle segment correct? Do they match what is actually posted on the senders?
+3. **Check period:** Is the cycle being run for the correct fiscal year and period? Test run output shows the period used.
+4. **Check validity:** Are the cycle and segment validity dates covering the execution period?
+
+### Symptom 4: Assessment Cycle Error: "No Valid Segments Found"
+
+**SAP Messages:** KD class errors; "No valid segments found for cycle..."
+**Symptom:** KSU5 or KSV5 fails immediately with no segments processed.
+**Root Cause:** The cycle has no active segments for the selected period/fiscal year, OR all segments' validity dates do not cover the execution period.
+**Resolution:**
+1. **Check cycle configuration:** KSU2/KSV2 — review each segment's validity dates (Valid From / Valid To)
+2. **Verify fiscal year:** Ensure the cycle has segments valid for the fiscal year being processed
+3. **Check segment status:** Segments can be deactivated — verify at least one segment is active
+4. **If new fiscal year:** Cycle segments may need validity dates extended or new segments created for the new fiscal year
+
+### Symptom 5: Distribution Fails: "Secondary Cost Elements Cannot Be Distributed"
+
+**SAP Messages:** KD class errors; "Cost element ... is a secondary cost element"
+**Symptom:** KSV5 (distribution) fails because the sender cost center has secondary cost element balances that cannot be distributed.
+**Root Cause:** The sender cost center received prior assessment allocations (secondary CE cat 42) or activity allocations (cat 43). Distribution can only handle primary cost elements — secondary CEs must use assessment.
+**Resolution:**
+1. **Understand the cause:** The sender CC has secondary CE balances from a prior KSU5 run or activity allocation
+2. **Option A:** Use assessment (KSU5) instead of distribution for this sender — assessment handles both primary and secondary CEs
+3. **Option B:** Restructure allocation sequence so distribution runs BEFORE assessment — distribution processes primary CEs first, then assessment handles the remaining (including its own secondary postings)
+4. **Check cycle configuration:** KSV2 — review whether the sender values filter includes secondary CE ranges (it should not for distribution)
+
+### Symptom 6: KO88 Settlement Skips Orders or Produces "No Settlement Rule" Error
+
+**SAP Messages:** KO class errors; "No settlement rule exists for order..."
+**Symptom:** KO88 runs but skips some orders, or produces error messages for orders without settlement rules. The CO period-end is incomplete.
+**Root Cause:** Settlement rule not maintained on the internal order (COBRB table has no entries for this order). Either the settlement rule was never created, or the order type's settlement profile does not enforce mandatory settlement rules.
+**Resolution:**
+1. **Fix immediately:** KO02 -> open the order -> click Settlement Rule button -> define receiver, percentage, settlement CE
+2. **Preventive fix:** Configure settlement profile (OKO7) to REQUIRE settlement rule at order creation. Assign this profile to the order type in KOT2.
+3. **Mass check:** Before period-end, run a report to identify all orders with status REL (released) that have no settlement rule (COBRB empty for AUFNR)
+4. **Test run:** Always run KO88 in test mode first to catch missing rules before live execution
+
+### Symptom 7: KO88 Settlement Fails: "Receiver Not Valid" or "Settlement Cost Element Not Found"
+
+**SAP Messages:** KO class errors; "Receiver ... not valid" or "Cost element ... not found in allocation structure"
+**Symptom:** KO88 fails for specific orders because the settlement rule points to an invalid receiver or the allocation structure does not map the source cost elements.
+**Root Cause:** Either the receiver object was deleted/closed/locked, or the allocation structure (OKO6) referenced by the settlement profile (OKO7) does not have a mapping for the cost elements posted on the order.
+**Resolution:**
+1. **Check settlement rule:** KO03 -> Settlement Rule -> verify receiver object exists and is active (not CLSD or deleted)
+2. **Check allocation structure:** OKO6 -> find the allocation structure referenced by the settlement profile (OKO7) -> verify mappings exist for the source cost elements on the order
+3. **Check settlement CE:** Verify the category 21 or 22 cost element exists (KA03) and is valid for the period
+4. **If receiver deleted:** Update the settlement rule in KO02 to point to a valid receiver
+
+### Symptom 8: CK24 Mark/Release Appears to Succeed but Standard Price Not Updated
+
+**SAP Messages:** No error — CK24 shows "successful" but MM03 still shows the old standard price.
+**Symptom:** After running CK24 mark and release, the material master standard price (MBEW-STPRS) has not changed. Production continues to use the old price.
+**Root Cause:** Transfer control (OK17) is not configured correctly for the costing variant used in CK11N. OK17 maps the costing variant and valuation variant to the MBEW price field. If the mapping is missing, CK24 release does not know which price field to update.
+**Resolution:**
+1. **Check OK17:** Verify transfer control entry exists for the costing variant used in CK11N — it must map to MBEW-STPRS (standard price field)
+2. **Check CK24 execution:** Were BOTH steps performed? Mark sets MBEW-ZPLP1 (future price) but STPRS is unchanged. Release updates STPRS. If only mark was run, the price is not yet active.
+3. **Verify via MM03:** Check Accounting 1 view — STPRS (standard price) and ZPLP1 (future planned price). If ZPLP1 shows the new price but STPRS shows the old, release has not been performed.
+4. **Check CK40N:** If using mass costing run, verify that both the "Mark" and "Release" steps completed without errors in the run log.
+
+### Symptom 9: KE5Z (PCA Report) Totals Differ from FAGLB03 (FI Report)
+
+**SAP Messages:** No error — reports show different totals for the same period and organizational unit.
+**Symptom:** PCA report (KE5Z, reads GLPCA) shows different amounts than the FI report (FAGLB03, reads FAGLFLEXT) for the same cost center or organizational unit. This is an ECC 6-specific reconciliation gap.
+**Root Cause:** Some FI postings do not carry a profit center assignment. The PCA separate ledger (GLPCA) is incomplete because not all FI documents have profit center derivation.
+**Resolution:**
+1. **Check cost center profit center assignment:** CSKS-PRCTR — every cost center must have a profit center assigned. If blank, costs posted to this CC will not appear in PCA.
+2. **Check 1KEF substitution rules:** Are substitution rules configured to derive profit center for all relevant posting scenarios? Gaps in substitution rules = gaps in GLPCA.
+3. **Check document splitting:** If New GL is active, document splitting should derive profit center on all line items. Verify splitting rules cover the relevant document types.
+4. **Historical correction:** Run 1KEK (PCA data transfer) to retroactively transfer FI postings to GLPCA for periods where gaps exist. This is a batch correction — not a substitute for fixing the root cause.
+
+### Symptom 10: CO Totals (KSB1) Higher Than FI Totals (FBL3N) for Same Cost Center
+
+**SAP Messages:** No error — this is EXPECTED BEHAVIOR, not a defect.
+**Symptom:** KSB1 (CO actual line items) shows a higher total than FBL3N/FAGLB03 (FI line items) for the same cost center and period. Users expect the totals to match and report it as an error.
+**Root Cause:** CO totals = primary postings (from FI) + secondary allocations (CO-only). Secondary cost elements (categories 21, 31, 41, 42, 43) exist only in CO and have no FI counterpart. The difference between CO and FI totals is exactly the secondary CE total.
+**Resolution:**
+1. **Explain:** This is by design, not an error. CO captures more cost information than FI because CO includes internal allocations.
+2. **Reconcile primary only:** Run KSB1 for the cost center, filter by PRIMARY cost elements only (categories 1, 3, 4, 11, 12). This total MUST match FBL3N/FAGLB03 for the corresponding GL accounts.
+3. **Identify secondary:** Run KSB1 filtered by SECONDARY cost elements (categories 21, 31, 41, 42, 43). This total = the difference between CO total and FI total.
+4. **Full reconciliation:** See the CO-FI Reconciliation Walkthrough section above for the complete 5-step reconciliation process.
