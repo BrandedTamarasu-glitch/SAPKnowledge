@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 5 complete — Phase 6 (MM Advanced & FI Integration) is next.
+**Current focus:** Phase 6 in progress — MM Advanced & FI Integration (plan 1 of 3 complete).
 
 ## Current Position
 
-Phase: 5 of 12 (MM Module Foundation) — Phase complete
-Plan: 4 of 4 in Phase 5
-Status: All Phase 5 plans complete (05-01 tcodes.md, 05-02 master-data.md, 05-03 config-spro.md, 05-04 processes.md + CLAUDE.md)
-Last activity: 2026-02-17 — Completed Phase 5 MM Module Foundation (4 plans, 1130 total lines, verified 27/28 must-haves; gap 1 fixed post-verification)
+Phase: 6 of 12 (MM Advanced & FI Integration)
+Plan: 1 of 3 in Phase 6
+Status: 06-01 complete (mm-advanced.md OBYC walkthrough); 06-02 and 06-03 pending
+Last activity: 2026-02-17 — Completed 06-01-PLAN.md (OBYC walkthrough, 266 lines, 7 worked examples, dual-axis reference)
 
-Progress: [█████░░░░░] 42%
+Progress: [█████░░░░░] 45%
 
-(16 known plans have SUMMARY.md)
+(17 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5)
+- Total plans completed: 17 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 1 Phase 6)
 - Average duration: ~2min
 - Total execution time: ~0.6 hours
 
@@ -34,10 +34,11 @@ Progress: [█████░░░░░] 42%
 | 03-fi-module-foundation | 4 (complete) | ~9min | ~2.3min |
 | 04-fi-advanced-and-integration-prep | 2 (complete) | ~6min | ~3min |
 | 05-mm-module-foundation | 4 (complete) | ~8min | ~2min |
+| 06-mm-advanced-and-fi-integration | 1 of 3 | ~4min | ~4min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (3min), 04-02 (3min), 05-01..04 (parallel wave)
-- Trend: Stable ~2-3min per content-writing plan
+- Last 5 plans: 04-02 (3min), 05-01..04 (parallel wave), 06-01 (4min)
+- Trend: Stable ~2-4min per content-writing plan
 
 *Updated after each plan completion*
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - CRITICAL CLARIFICATION: document splitting is NOT parallel accounting — must be preserved in all future FI content (04-02)
 - Troubleshooting entries are self-contained (full resolution path inline) to avoid requiring multiple file lookups (04-02)
 - Decision trees include config implications inline, not just pointers to config-spro.md (04-02)
+- validate.py updated to accept decision-trees-and-troubleshooting and account-determination content types (06-01)
 
 ### Pending Todos
 
@@ -96,5 +98,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 04-02-PLAN.md (7 decision trees, 7 pitfalls, 7 symptoms, 367 lines; CLAUDE.md updated). Phase 4 complete (both plans done).
+Stopped at: Completed 06-01-PLAN.md (OBYC walkthrough, 266 lines, dual-axis reference, 7 worked examples, debugging path). Phase 6 plan 1 of 3 done.
 Resume file: None
