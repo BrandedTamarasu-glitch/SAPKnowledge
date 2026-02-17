@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 3 of 12 (FI Module Foundation) — In progress
-Plan: 2 of 4 in Phase 3
-Status: 03-01 (FI T-codes) and 03-02 (FI master data) complete; 03-03 and 03-04 remaining
-Last activity: 2026-02-17 — Completed 03-02-PLAN.md (FI master data: 11 table segments, 4 field-location corrections)
+Plan: 3 of 4 in Phase 3
+Status: 03-01 (FI T-codes), 03-02 (FI master data), and 03-03 (FI SPRO config) complete; 03-04 remaining
+Last activity: 2026-02-17 — Completed 03-03-PLAN.md (FI SPRO config: 27 steps across GL/AP-AR/AA/New GL)
 
-Progress: [███░░░░░░░] 25%
+Progress: [████░░░░░░] 28%
 
-(3 of 12 phases partially complete; 8 known plans have SUMMARY.md)
+(3 of 12 phases partially complete; 9 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (4 Phase 1 + 2 Phase 2 + 2 Phase 3)
+- Total plans completed: 9 (4 Phase 1 + 2 Phase 2 + 3 Phase 3)
 - Average duration: ~2min
 - Total execution time: ~0.4 hours
 
@@ -31,11 +31,11 @@ Progress: [███░░░░░░░] 25%
 |-------|-------|-------|----------|
 | 01-repository-foundation | 4 | ~12min | ~3min |
 | 02-core-reference-framework | 2 | ~5min | ~2.5min |
-| 03-fi-module-foundation | 2 (of 4) | ~5min | ~2.5min |
+| 03-fi-module-foundation | 3 (of 4) | ~7min | ~2.3min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (1min), 02-01 rerun (2min), 03-01 (3min), 03-02 (2min)
-- Trend: Stable ~2-3min per content-writing plan
+- Last 5 plans: 02-01 rerun (2min), 03-01 (3min), 03-02 (2min), 03-03 (2min)
+- Trend: Stable ~2min per content-writing plan
 
 *Updated after each plan completion*
 
@@ -68,6 +68,10 @@ Recent decisions affecting current work:
 - master-data.md written as single file (not split by object) for single-lookup master data reference (03-02)
 - CORRECTION note blocks used for commonly-wrong field locations (AKONT, FDGRV, KVGR1-5, KOSTL) — field-location errors are #1 source of bad SAP content (03-02)
 - S/4HANA Business Partner callout placed once at customer master section header, covers both vendor+customer (03-02)
+- config-spro.md written as single file covering all four FI config areas — single-lookup SPRO reference (03-03)
+- AA config order (EC08→OAOB→OAOA→AO90→AFAMA) documented at section header with CRITICAL warning — most dangerous FI config mistake (03-03)
+- FBZP 5 sub-areas under one step (not 5 steps) — reflects how consultants describe FBZP in practice (03-03)
+- Document splitting client-level warning uses CRITICAL callout; per-CC deactivation path included (03-03)
 
 ### Pending Todos
 
@@ -80,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 03-02-PLAN.md (FI master data reference, 11 table segments). Phase 3 plan 2 of 4 done.
+Stopped at: Completed 03-03-PLAN.md (FI SPRO config reference, 27 steps, 314 lines). Phase 3 plan 3 of 4 done.
 Resume file: None
