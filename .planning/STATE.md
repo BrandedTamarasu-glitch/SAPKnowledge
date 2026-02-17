@@ -9,18 +9,20 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 ## Current Position
 
-Phase: 2 of 12 (Core Reference Framework) — In progress
-Plan: 2 of N in Phase 2
-Status: In progress
-Last activity: 2026-02-17 — Completed 02-02-PLAN.md (disambiguation expansion)
+Phase: 2 of 12 (Core Reference Framework) — COMPLETE
+Plan: 2 of 2 in Phase 2
+Status: Phase 2 complete; both plans (02-01 and 02-02) done
+Last activity: 2026-02-16 — Completed 02-01-PLAN.md (org structure comprehensive reference)
 
-Progress: [██░░░░░░░░] ~10%
+Progress: [██░░░░░░░░] 17%
+
+(2 of 12 phases complete; all 6 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 6 (4 Phase 1 + 2 Phase 2)
-- Average duration: ~2min
+- Average duration: ~2-3min
 - Total execution time: ~0.3 hours
 
 **By Phase:**
@@ -28,11 +30,11 @@ Progress: [██░░░░░░░░] ~10%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-repository-foundation | 4 | ~12min | ~3min |
-| 02-core-reference-framework | 2 so far | ~3min | ~1.5min |
+| 02-core-reference-framework | 2 | ~5min | ~2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (3min), 01-03 (4min), 01-04 (3min), 02-01 (?min), 02-02 (1min)
-- Trend: Fast
+- Last 5 plans: 01-03 (4min), 01-04 (3min), 02-01 (2min), 02-02 (1min), 02-01 rerun (2min)
+- Trend: Stable
 
 *Updated after each plan completion*
 
@@ -52,8 +54,11 @@ Recent decisions affecting current work:
 - Org structure uses ASCII tree diagram for compact visual hierarchy (01-01)
 - Used PyYAML directly instead of python-frontmatter (pip unavailable on system) (01-03)
 - Subagents cannot write to SAPKnowledge from General working directory — execute plans from orchestrator (01-02, 01-03, 01-04)
-- Disambiguation table rows added at end of table (after MRP) when domain-specific rows are added; cross-reference links to detail files (02-02)
-- Token budget after 02-02 expansion: ~975 tokens of 1500 limit (02-02)
+- Disambiguation table rows added at end of table when domain-specific rows are added; cross-reference links to detail files (02-02)
+- Token budget after phase 2 expansion: ~975 tokens of 1500 limit (02-02)
+- Sales Area documented as special non-table subsection (not a separate DB entity) to prevent confusion (02-01)
+- Segment org unit carries CRITICAL ECC 6 NOTE about New GL prerequisite — important disambiguation (02-01)
+- Purchasing Org three-assignment-mode pattern documented inline (02-01)
 
 ### Pending Todos
 
@@ -61,11 +66,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Subagent directory permission issue: agents spawned from ~/Claude/General cannot write to ~/Claude/SAPKnowledge. Workaround: execute plans directly from orchestrator level. Consider running future sessions from SAPKnowledge directory.
-- Cross-reference in sap-disambiguation.md now points to reference/org-structure.md — that file needs content for the link to be useful (Phase 2 remaining plans should address this).
+- Subagent directory permission issue: agents spawned from ~/Claude/General cannot write to ~/Claude/SAPKnowledge. Workaround: execute plans directly from orchestrator level.
 
 ## Session Continuity
 
-Last session: 2026-02-17
-Stopped at: Completed 02-02-PLAN.md (disambiguation expansion with org-structure S/4 rows)
+Last session: 2026-02-16
+Stopped at: Phase 2 complete. Ready for Phase 3 (FI module or next planned phase).
 Resume file: None
