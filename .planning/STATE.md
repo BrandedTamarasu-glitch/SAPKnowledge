@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 6 in progress — MM Advanced & FI Integration (plan 2 of 3 complete).
+**Current focus:** Phase 6 complete — MM Advanced & FI Integration (all 3 plans done). Ready for Phase 7.
 
 ## Current Position
 
-Phase: 6 of 12 (MM Advanced & FI Integration)
-Plan: 2 of 3 in Phase 6
-Status: 06-01 complete, 06-02 complete (integration.md MM-FI reference); 06-03 pending
-Last activity: 2026-02-17 — Completed 06-02-PLAN.md (MM-FI integration: 20-transaction catalog, MIGO 101 trace, GR/IR clearing, period-end)
+Phase: 6 of 12 (MM Advanced & FI Integration) — COMPLETE
+Plan: 3 of 3 in Phase 6 (all complete)
+Status: 06-01 complete, 06-02 complete, 06-03 complete (decision trees + troubleshooting)
+Last activity: 2026-02-17 — Completed 06-03-PLAN.md (12 decision trees, 12 troubleshooting entries, CLAUDE.md index update)
 
-Progress: [██████░░░░] 47%
+Progress: [██████░░░░] 50%
 
-(18 known plans have SUMMARY.md)
+(19 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 2 Phase 6)
+- Total plans completed: 19 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 2 Phase 4 + 4 Phase 5 + 3 Phase 6)
 - Average duration: ~2min
 - Total execution time: ~0.6 hours
 
@@ -34,10 +34,10 @@ Progress: [██████░░░░] 47%
 | 03-fi-module-foundation | 4 (complete) | ~9min | ~2.3min |
 | 04-fi-advanced-and-integration-prep | 2 (complete) | ~6min | ~3min |
 | 05-mm-module-foundation | 4 (complete) | ~8min | ~2min |
-| 06-mm-advanced-and-fi-integration | 2 of 3 | ~9min | ~4.5min |
+| 06-mm-advanced-and-fi-integration | 3 (complete) | ~14min | ~4.7min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (3min), 05-01..04 (parallel wave), 06-01 (4min), 06-02 (5min)
+- Last 5 plans: 05-01..04 (parallel wave), 06-01 (4min), 06-02 (5min), 06-03 (5min)
 - Trend: Stable ~2-5min per content-writing plan
 
 *Updated after each plan completion*
@@ -88,6 +88,7 @@ Recent decisions affecting current work:
 - validate.py updated to accept decision-trees-and-troubleshooting and account-determination content types (06-01)
 - validate.py: S/4HANA Differences section now stripped from contamination scan — prevents false positives on intentional disambiguation content (06-02)
 - validate.py: integration content type token budget raised from 3000 to 5000 — comprehensive integration docs need more space (06-02)
+- Token budget warnings accepted for mm-advanced.md (12524 tokens vs 5000 cap) — file intentionally covers OBYC + decision trees + troubleshooting; splitting would reduce usability (06-03)
 
 ### Pending Todos
 
@@ -100,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 06-02-PLAN.md (MM-FI integration: 20-transaction catalog, MIGO 101 trace, MIRO trace, GR/IR clearing, period-end). Phase 6 plan 2 of 3 done.
+Stopped at: Completed 06-03-PLAN.md (12 decision trees, 12 troubleshooting entries, CLAUDE.md index update). Phase 6 complete (all 3 plans done).
 Resume file: None
