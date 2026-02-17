@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 3 - FI Module Foundation
+**Current focus:** Phase 4 - FI Advanced & Integration Prep (next up)
 
 ## Current Position
 

@@ -18,10 +18,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### FI — Financial Accounting
 
-- [ ] **FI-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
-- [ ] **FI-02**: SPRO/IMG configuration paths for GL, AP, AR, and asset accounting with step-by-step guidance
-- [ ] **FI-03**: Business process maps for record-to-report tied to specific transactions and config
-- [ ] **FI-04**: Master data reference covering GL accounts, vendor master, customer master, asset master — key fields and relationships
+- [x] **FI-01**: Curated T-code reference (50-80 transactions) with descriptions, menu paths, and usage context
+- [x] **FI-02**: SPRO/IMG configuration paths for GL, AP, AR, and asset accounting with step-by-step guidance
+- [x] **FI-03**: Business process maps for record-to-report tied to specific transactions and config
+- [x] **FI-04**: Master data reference covering GL accounts, vendor master, customer master, asset master — key fields and relationships
 - [ ] **FI-05**: Account determination logic for automatic postings (integration with MM and SD)
 - [ ] **FI-06**: Configuration decision trees for common FI scenarios (parallel accounting, payment terms, dunning)
 - [ ] **FI-07**: Common FI gotchas and troubleshooting guide specific to ECC 6
@@ -112,10 +112,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | FOUND-06 | Phase 1 | Complete |
 | FOUND-03 | Phase 2 | Complete |
 | FOUND-04 | Phase 2 | Complete |
-| FI-01 | Phase 3 | Pending |
-| FI-02 | Phase 3 | Pending |
-| FI-03 | Phase 3 | Pending |
-| FI-04 | Phase 3 | Pending |
+| FI-01 | Phase 3 | Complete |
+| FI-02 | Phase 3 | Complete |
+| FI-03 | Phase 3 | Complete |
+| FI-04 | Phase 3 | Complete |
 | FI-05 | Phase 4 | Pending |
 | FI-06 | Phase 4 | Pending |
 | FI-07 | Phase 4 | Pending |
