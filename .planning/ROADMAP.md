@@ -186,12 +186,12 @@ Plans:
   3. Common CO gotchas and troubleshooting guide resolves ECC 6-specific issues
   4. CO-FI integration point documentation covers cost element types, reconciliation ledger, real-time integration completely
   5. User can trace "how cost center postings reconcile with FI" from content
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
-- [ ] 10-03: TBD
+- [ ] 10-01-PLAN.md — Cost element mapping walkthrough (co-advanced.md): CE mapping table (11 categories), CO-FI real-time integration flow, reconciliation walkthrough, reconciliation ledger (COFIT/COFIS/KALC)
+- [ ] 10-02-PLAN.md — CO-FI integration (integration.md): 3-direction integration point catalog (FI->CO, CO->FI, CO-internal), FB50-to-CO trace, KO88-to-FI trace, period-end timing
+- [ ] 10-03-PLAN.md — Decision trees + troubleshooting (co-advanced.md + CLAUDE.md): 10 decision trees (allocation, settlement, hierarchy, planning, transfer pricing), 10 troubleshooting entries with OKB9 as #1
 
 ### Phase 11: Cross-Module Integration
 **Goal**: Complete integration coverage with MM-SD touchpoints and deliver end-to-end process flows spanning multiple modules
@@ -243,6 +243,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. SD Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 8. SD Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
 | 9. CO Module Foundation | 4/4 | Complete | 2026-02-17 |
-| 10. CO Advanced & FI Integration | 0/TBD | Not started | - |
+| 10. CO Advanced & FI Integration | 0/3 | Planned | - |
 | 11. Cross-Module Integration | 0/TBD | Not started | - |
 | 12. Solution Design Intelligence | 0/TBD | Not started | - |
