@@ -134,12 +134,13 @@ Plans:
   2. User can navigate SPRO/IMG configuration for SD with step-by-step paths
   3. Order-to-cash business process maps tie specific transactions to process steps
   4. Master data reference covers customer master, material master sales views, pricing conditions, output determination with key field explanations
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
+- [ ] 07-01-PLAN.md — SD T-code reference (~75 T-codes across Sales/Shipping/Billing/Pricing/Output/Credit/Returns/Rebates)
+- [ ] 07-02-PLAN.md — SD master data reference (customer master KNA1/KNB1/KNVV, condition records KONH/KONP, output determination, MVKE)
+- [ ] 07-03-PLAN.md — SD SPRO config reference (Enterprise Structure, Document Types, Pricing, Copy Control, Delivery, Billing, Output, Supporting Functions)
+- [ ] 07-04-PLAN.md — SD process flows (standard O2C, returns, credit/debit memos, cash sales, rush orders, consignment, third-party) + CLAUDE.md update
 
 ### Phase 8: SD Advanced & FI Integration
 **Goal**: Document VKOA account determination, SD decision trees (including pricing foundations), troubleshooting, and complete SD-FI integration point
