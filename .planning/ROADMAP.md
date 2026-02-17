@@ -53,11 +53,11 @@ Plans:
   2. ECC 6 vs S/4HANA disambiguation framework exists with dedicated annotations for behavioral differences
   3. Every query touching org units resolves correct hierarchical relationships from reference
   4. Claude explicitly identifies when asked about S/4HANA-only features (Universal Journal, Business Partner, MATDOC)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Comprehensive org structure reference (reference/org-structure.md) with all 16 org units, cardinality rules, cross-module consequences, S/4 callouts
+- [ ] 02-02-PLAN.md — Expand sap-disambiguation.md with org-structure-specific S/4HANA rows
 
 ### Phase 3: FI Module Foundation
 **Goal**: Deliver complete FI reference covering transactions, configuration, processes, and master data as integration target for all other modules
