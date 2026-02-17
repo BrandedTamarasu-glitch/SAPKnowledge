@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: FI Advanced & Integration Prep** - Account determination, decision trees, troubleshooting
 - [x] **Phase 5: MM Module Foundation** - T-codes, SPRO paths, processes, master data
 - [x] **Phase 6: MM Advanced & FI Integration** - OBYC account determination, decision trees, MM-FI integration
-- [ ] **Phase 7: SD Module Foundation** - T-codes, SPRO paths, processes, master data
+- [x] **Phase 7: SD Module Foundation** - T-codes, SPRO paths, processes, master data
 - [ ] **Phase 8: SD Advanced & FI Integration** - VKOA account determination, pricing basics, SD-FI integration
 - [ ] **Phase 9: CO Module Foundation** - T-codes, SPRO paths, processes, master data
 - [ ] **Phase 10: CO Advanced & FI Integration** - Cost element mapping, CO-FI reconciliation, decision trees
@@ -152,12 +152,12 @@ Plans:
   3. Common SD gotchas and troubleshooting guide resolves ECC 6-specific issues
   4. SD-FI integration point documentation covers billing postings, revenue recognition, VKOA mapping completely
   5. User can trace "what happens in FI when I post VF01 billing document" from content
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
-- [ ] 08-03: TBD
+- [ ] 08-01-PLAN.md — VKOA account determination walkthrough (sd-advanced.md): dual-axis reference by account key and condition type, pricing-to-VKOA chain, 8 worked billing-to-GL examples, debugging path
+- [ ] 08-02-PLAN.md — SD-FI integration (integration.md): integration point catalog (14 touchpoints), VF01 billing-to-FI trace, PGI COGS trace, revenue recognition, period-end impacts
+- [ ] 08-03-PLAN.md — Decision trees + troubleshooting (sd-advanced.md + CLAUDE.md): 12 decision trees (4 pricing, 1 copy control, 7 other SD config), 12 troubleshooting entries with SAP message IDs
 
 ### Phase 9: CO Module Foundation
 **Goal**: Deliver complete CO reference covering transactions, configuration, processes, and master data for cost accounting
@@ -240,7 +240,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. MM Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 6. MM Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
 | 7. SD Module Foundation | 4/4 | Complete | 2026-02-17 |
-| 8. SD Advanced & FI Integration | 0/TBD | Not started | - |
+| 8. SD Advanced & FI Integration | 0/3 | Not started | - |
 | 9. CO Module Foundation | 0/TBD | Not started | - |
 | 10. CO Advanced & FI Integration | 0/TBD | Not started | - |
 | 11. Cross-Module Integration | 0/TBD | Not started | - |
