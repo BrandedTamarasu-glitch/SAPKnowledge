@@ -144,28 +144,69 @@ Alternatively, the customer may receive a replacement delivery instead of a cred
 
 ## 3. Credit and Debit Memos
 
+Credit and debit memo requests are SD documents that trigger billing adjustments without a delivery. They reference the original sales transaction and create FI postings that adjust the customer balance.
+
 ### Credit Memo Request → Credit Memo
-**Step 1 — Create Credit Memo Request** (Sales Rep): VA01, doc type CR. Captures the reason for the credit (pricing error, damaged goods, goodwill). Requires approval before billing.
-**Step 2 — Block/Release** (Sales Manager): Credit memo request may be blocked for approval. Release via billing block removal in VA02.
-**Step 3 — Create Credit Memo** (Billing Clerk): VF01 creates billing type G2 (credit memo). FI posting: Dr Revenue / Cr Customer.
+
+**Step 1 — Create Credit Memo Request** (Sales Rep)
+VA01 with document type CR. Captures the reason for the credit (pricing error, damaged goods, goodwill). Enter the customer, reference the original billing document or sales order, and specify the credit amount. The credit memo request does NOT post to FI — it is a sales document awaiting approval and billing.
+
+**Step 2 — Block/Release** (Sales Manager)
+Credit memo requests are typically created with a billing block (configured in VOV8 at document type level). The sales manager reviews the credit reason and amount, then releases by removing the billing block in VA02. This approval step prevents unauthorized credits.
+
+**Step 3 — Create Credit Memo** (Billing Clerk)
+VF01 creates billing type G2 (credit memo) from the released credit memo request. FI posting: Dr Revenue / Cr Customer. The customer balance is reduced. The credit memo appears in FBL5N as a credit open item that can offset outstanding invoices.
+
+### Summary Table — Credit Memo
+
+| Step | Activity | T-code | Role | Output |
+|------|----------|--------|------|--------|
+| 1 | Create credit memo request | VA01 (CR) | Sales Rep | CR document (no FI posting) |
+| 2 | Release billing block | VA02 | Sales Manager | Billing block removed |
+| 3 | Create credit memo | VF01 | Billing Clerk | G2 billing doc; FI: Dr Revenue / Cr Customer |
 
 ### Debit Memo Request → Debit Memo
-**Step 1 — Create Debit Memo Request** (Sales Rep): VA01, doc type DR. Used when the customer was undercharged.
-**Step 2 — Create Debit Memo** (Billing Clerk): VF01 creates billing type L2 (debit memo). FI posting: Dr Customer / Cr Revenue.
+
+**Step 1 — Create Debit Memo Request** (Sales Rep)
+VA01 with document type DR. Used when the customer was undercharged — price increase, additional charges, or billing correction requiring an additional charge. Enter the customer, reference the original document, and specify the additional amount.
+
+**Step 2 — Create Debit Memo** (Billing Clerk)
+VF01 creates billing type L2 (debit memo). FI posting: Dr Customer / Cr Revenue. The customer balance is increased by the debit memo amount.
+
+### Summary Table — Debit Memo
+
+| Step | Activity | T-code | Role | Output |
+|------|----------|--------|------|--------|
+| 1 | Create debit memo request | VA01 (DR) | Sales Rep | DR document (no FI posting) |
+| 2 | Create debit memo | VF01 | Billing Clerk | L2 billing doc; FI: Dr Customer / Cr Revenue |
 
 ---
 
 ## 4. Cash Sales
 
-VA01 with document type CS (cash sale). The system creates the order, delivery, and billing document simultaneously. The customer pays immediately at the point of sale — no open item is created. FI posting: Dr Cash/Bank / Cr Revenue.
+VA01 with document type CS (cash sale). The system creates the order, delivery, and billing document simultaneously at order save. The customer pays immediately at the point of sale — no open AR item is created. FI posting: Dr Cash/Bank / Cr Revenue.
 
-Gotcha: Cash sales require a specific delivery type and billing type configured in VOV8. The item category determination uses the CS document type to propose the correct item category.
+The cash sale process combines all standard O2C steps into a single transaction:
+1. Sales order created (VBAK/VBAP)
+2. Delivery created automatically (LIKP/LIPS)
+3. PGI posted automatically (MKPF/MSEG, movement type 601)
+4. Billing document created automatically (VBRK/VBRP)
+5. FI document created (BKPF/BSEG) — Dr Cash or Bank / Cr Revenue
+
+Gotcha: Cash sales require a specific delivery type and billing type configured in VOV8. The item category determination uses the CS document type to propose the correct item category (BVN for cash sale items).
 
 ---
 
 ## 5. Rush Orders
 
-VA01 with document type RO (rush order). The delivery is created automatically at order save (no separate VL01N step). The rest of the process follows standard O2C: manual PGI in VL02N → billing in VF01. Rush orders skip the delivery creation queue but still require PGI and billing as separate steps.
+VA01 with document type RO (rush order). The delivery is created automatically at order save (no separate VL01N step), but PGI and billing are NOT automatic — they remain separate manual steps.
+
+The rush order process:
+1. Sales order created → delivery created automatically at order save (LIKP/LIPS)
+2. PGI posted manually in VL02N (movement type 601)
+3. Billing created manually in VF01/VF04
+
+Rush orders skip the delivery creation queue but still require PGI and billing as separate steps. The key difference from cash sales: rush orders create an AR open item (customer must pay later), while cash sales require immediate payment.
 
 ---
 
@@ -207,3 +248,13 @@ In third-party processing, the company takes the customer order but the vendor s
 **Step 5 — Bill the Customer** (Billing Clerk): Create billing document in VF01 from the sales order (order-related billing, not delivery-related). FI posting: Dr Customer / Cr Revenue.
 
 > Third-party processing spans MM (purchasing) and SD (sales). The sales order triggers the MM procurement cycle. Key config: item category TAS with billing relevance = B (order-related billing).
+
+### Summary Table
+
+| Step | Activity | T-code | Role | Output |
+|------|----------|--------|------|--------|
+| 1 | Create sales order (TAS item cat) | VA01 | Sales Rep | Sales order + auto PR |
+| 2 | Create purchase order to vendor | ME21N | Buyer | PO with customer ship-to address |
+| 3 | Vendor ships to customer | — | Vendor | No SD delivery document |
+| 4 | Post vendor invoice | MIRO | AP Accountant | Statistical GR + vendor open item |
+| 5 | Bill the customer | VF01 | Billing Clerk | Billing doc; FI: Dr Customer / Cr Revenue |
