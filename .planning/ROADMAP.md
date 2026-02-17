@@ -118,12 +118,12 @@ Plans:
   3. Common MM gotchas and troubleshooting guide resolves ECC 6-specific issues
   4. MM-FI integration point documentation covers goods receipt/issue postings, invoice verification, OBYC mapping completely
   5. User can trace "what happens in FI when I post MIGO with movement type 101" from content
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [ ] 06-01-PLAN.md — OBYC account determination walkthrough (mm-advanced.md): dual-axis reference, valuation class setup chain, 10+ worked examples, debugging path
+- [ ] 06-02-PLAN.md — MM-FI integration (integration.md): integration point catalog, MIGO 101/MIRO transaction traces, GR/IR clearing, period-end impacts
+- [ ] 06-03-PLAN.md — Decision trees + troubleshooting (mm-advanced.md + CLAUDE.md): 12 decision trees, 12 troubleshooting entries with SAP message IDs
 
 ### Phase 7: SD Module Foundation
 **Goal**: Deliver complete SD reference covering transactions, configuration, processes, and master data for order-to-cash
