@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 4 - FI Advanced & Integration Prep (next up)
+**Current focus:** Phase 4 - FI Advanced & Integration Prep (in progress)
 
 ## Current Position
 
-Phase: 3 of 12 (FI Module Foundation) — Phase complete
-Plan: 4 of 4 in Phase 3
-Status: All four Phase 3 plans complete (03-01 T-codes, 03-02 master data, 03-03 SPRO config, 03-04 processes)
-Last activity: 2026-02-17 — Completed 03-04-PLAN.md (FI processes: 4 process flows, 176 lines; CLAUDE.md updated)
+Phase: 4 of 12 (FI Advanced & Integration Prep) — In progress
+Plan: 1 of 2 in Phase 4
+Status: 04-01 complete (account-determination.md); 04-02 pending
+Last activity: 2026-02-17 — Completed 04-01-PLAN.md (account determination: OBYC, VKOA, FI-only auto postings, 372 lines)
 
-Progress: [████░░░░░░] 31%
+Progress: [████░░░░░░] 33%
 
-(Phase 3 complete; 10 known plans have SUMMARY.md)
+(11 known plans have SUMMARY.md)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10 (4 Phase 1 + 2 Phase 2 + 4 Phase 3)
+- Total plans completed: 11 (4 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4)
 - Average duration: ~2min
-- Total execution time: ~0.4 hours
+- Total execution time: ~0.5 hours
 
 **By Phase:**
 
@@ -32,10 +32,11 @@ Progress: [████░░░░░░] 31%
 | 01-repository-foundation | 4 | ~12min | ~3min |
 | 02-core-reference-framework | 2 | ~5min | ~2.5min |
 | 03-fi-module-foundation | 4 (complete) | ~9min | ~2.3min |
+| 04-fi-advanced-and-integration-prep | 1 so far | ~3min | ~3min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (3min), 03-02 (2min), 03-03 (2min), 03-04 (2min)
-- Trend: Stable ~2min per content-writing plan
+- Last 5 plans: 03-02 (2min), 03-03 (2min), 03-04 (2min), 04-01 (3min)
+- Trend: Stable ~2-3min per content-writing plan
 
 *Updated after each plan completion*
 
@@ -75,6 +76,10 @@ Recent decisions affecting current work:
 - processes.md uses narrative-plus-table format with role annotations at each step (03-04)
 - Cross-references embedded inline: FBZP→config-spro.md, S_ALR confusion warning, AFAB→AJAB dependency (03-04)
 - CLAUDE.md File Index updated to specific Read When guidance (not generic) for all four Phase 3 files (03-04)
+- account-determination.md: cash discount config = OBXU/OBXI (NOT OBB8); OBB8 = payment terms only (04-01)
+- PRD fires for movement type 101 on standard price (S) materials only; MAP (V) absorbs variance into BSX (04-01)
+- VKOA section scoped to framework intro; Phase 8 (SD Advanced) owns the full VKOA deep-dive (04-01)
+- GR/IR clearing account OI indicator = required for F.13 automatic clearing — documented as critical implementation pitfall (04-01)
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 03-04-PLAN.md (FI processes: 4 process flows, 176 lines). Phase 3 complete (all 4 plans done).
+Stopped at: Completed 04-01-PLAN.md (account determination: OBYC/VKOA/FI-only auto postings, 372 lines). Phase 4 plan 1 of 2 done.
 Resume file: None
