@@ -72,8 +72,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Solution Design
 
 - [x] **SOLN-01**: Solution design patterns mapping common business requirements to SAP ECC 6 capabilities with recommended configuration approach
-- [ ] **SOLN-02**: Scenario playbooks for complex processes (consignment, intercompany sales, third-party processing, subcontracting)
-- [ ] **SOLN-03**: Scenario playbooks for complex config (split valuation, special procurement, batch management, serial numbers)
+- [x] **SOLN-02**: Scenario playbooks for complex processes (consignment, intercompany sales, third-party processing, subcontracting)
+- [x] **SOLN-03**: Scenario playbooks for complex config (split valuation, special procurement, batch management, serial numbers)
 - [ ] **SOLN-04**: Operational checklists for month-end and year-end close across MM, SD, FI, CO
 
 ## v2 Requirements
@@ -148,8 +148,8 @@ Requirements for initial release. Each maps to roadmap phases.
 | E2E-02 | Phase 11 | Complete |
 | E2E-03 | Phase 11 | Complete |
 | SOLN-01 | Phase 12 | Complete |
-| SOLN-02 | Phase 12 | Pending |
-| SOLN-03 | Phase 12 | Pending |
+| SOLN-02 | Phase 12 | Complete |
+| SOLN-03 | Phase 12 | Complete |
 | SOLN-04 | Phase 12 | Pending |
 
 **Coverage:**

@@ -46,6 +46,7 @@ Progress: [██████████] 97%
 
 *Updated after each plan completion*
 | Phase 12-solution-design-intelligence P01 | 5 | 1 tasks | 1 files |
+| Phase 12 P02 | 15 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,8 @@ Recent decisions affecting current work:
 - [Phase 11]: R2R documented as period-end orchestration (not linear document flow) across all 4 modules with strict ordering: MM -> SD -> CO -> FI
 - [Phase 12-solution-design-intelligence]: Token budget warning accepted for design-patterns.md (11501 tokens vs 4000 cap) — same pattern as mm-advanced.md, sd-advanced.md, co-advanced.md
 - [Phase 12-solution-design-intelligence]: content_type set to 'patterns' (not 'design-patterns') to match validate.py expected types
+- [Phase 12]: Playbooks use cross-reference synthesis pattern — point to module files for config detail, add cross-module FI/CO perspective and test scenarios unavailable in single module files
+- [Phase 12]: validate.py updated to accept playbooks and checklists content types — pre-registering checklists prevents blocking issue in Plan 03
 
 ### Pending Todos
 
@@ -143,5 +146,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 12-01-PLAN.md — design-patterns.md with 12 cross-module solution design patterns. Phase 12 Plan 1 complete.
+Stopped at: Completed 12-02-PLAN.md — playbooks.md with 8 cross-module scenario playbooks. Phase 12 Plan 2 complete.
 Resume file: None
