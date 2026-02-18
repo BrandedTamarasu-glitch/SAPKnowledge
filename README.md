@@ -30,9 +30,11 @@ Start with the module's CLAUDE.md file for orientation, or read
 Important: This knowledge base covers ECC 6.0 only, not S/4HANA.
 ```
 
+Claude Code automatically loads all `.md` files under `~/.claude/rules/` as global rules — no additional configuration needed.
+
 ### Step 3 — Verify it's loading
 
-Open Claude Code in any project and run `/config`. Look for the rule file listed under **Global rules**. If it appears, you're set.
+Open Claude Code in any project and run `/config`. Look for the rule file listed under **Global rules**. Alternatively, ask Claude: *"Do you have a global rule about SAP?"* — it should confirm the knowledge base is active.
 
 ### Step 4 — Ask SAP questions naturally
 
