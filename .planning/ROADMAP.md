@@ -220,12 +220,12 @@ Plans:
   3. Scenario playbooks guide complex config (split valuation, special procurement, batch management, serial numbers)
   4. Operational checklists cover month-end and year-end close across MM, SD, FI, CO with specific T-codes and sequence
   5. User can answer "how do I implement consignment in ECC 6" or "what's the month-end close checklist" from content
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
-- [ ] 12-03: TBD
+- [ ] 12-01-PLAN.md — Design patterns (cross-module/design-patterns.md): 12 cross-module solution design patterns in cookbook format
+- [ ] 12-02-PLAN.md — Playbooks (cross-module/playbooks.md): 8 scenario playbooks (4 process + 4 config) with full implementation walkthroughs
+- [ ] 12-03-PLAN.md — Checklists + navigation (cross-module/checklists.md, routing updates, module stub updates)
 
 ## Progress
 
@@ -245,4 +245,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. CO Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 10. CO Advanced & FI Integration | 3/3 | Complete    | 2026-02-17 |
 | 11. Cross-Module Integration | 3/3 | Complete    | 2026-02-18 |
-| 12. Solution Design Intelligence | 0/TBD | Not started | - |
+| 12. Solution Design Intelligence | 0/3 | Not started | - |
