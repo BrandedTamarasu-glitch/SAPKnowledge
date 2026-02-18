@@ -65,8 +65,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### End-to-End Processes
 
-- [ ] **E2E-01**: Procure-to-Pay full process flow across MM and FI with transaction sequence, document flow, and integration touchpoints
-- [ ] **E2E-02**: Order-to-Cash full process flow across SD and FI with transaction sequence, document flow, and integration touchpoints
+- [x] **E2E-01**: Procure-to-Pay full process flow across MM and FI with transaction sequence, document flow, and integration touchpoints
+- [x] **E2E-02**: Order-to-Cash full process flow across SD and FI with transaction sequence, document flow, and integration touchpoints
 - [ ] **E2E-03**: Record-to-Report full process flow across FI and CO with period-end activities, reconciliation steps, and reporting
 
 ### Solution Design
@@ -144,8 +144,8 @@ Requirements for initial release. Each maps to roadmap phases.
 | CO-07 | Phase 10 | Pending |
 | INTG-03 | Phase 10 | Pending |
 | INTG-04 | Phase 11 | Complete |
-| E2E-01 | Phase 11 | Pending |
-| E2E-02 | Phase 11 | Pending |
+| E2E-01 | Phase 11 | Complete |
+| E2E-02 | Phase 11 | Complete |
 | E2E-03 | Phase 11 | Pending |
 | SOLN-01 | Phase 12 | Pending |
 | SOLN-02 | Phase 12 | Pending |
