@@ -203,12 +203,12 @@ Plans:
   3. Order-to-Cash full process flow documents transaction sequence, document flow, integration touchpoints across SD and FI
   4. Record-to-Report full process flow documents period-end activities, reconciliation steps, reporting across FI and CO
   5. User can answer "what's the complete flow from PO to payment" or "from sales order to revenue recognition" from content
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 11-01: TBD
-- [ ] 11-02: TBD
-- [ ] 11-03: TBD
+- [ ] 11-01-PLAN.md — MM-SD integration reference (mm-sd-integration.md): ATP, PGI, returns, consignment, STO, third-party, subcontracting
+- [ ] 11-02-PLAN.md — P2P and O2C end-to-end process flows (procure-to-pay.md, order-to-cash.md)
+- [ ] 11-03-PLAN.md — R2R end-to-end flow with period-end ordering + navigation updates (CLAUDE.md, routing, See Also)
 
 ### Phase 12: Solution Design Intelligence
 **Goal**: Layer solution design patterns, scenario playbooks, and operational checklists on top of complete module and integration foundation
@@ -244,5 +244,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 8. SD Advanced & FI Integration | 3/3 | Complete | 2026-02-17 |
 | 9. CO Module Foundation | 4/4 | Complete | 2026-02-17 |
 | 10. CO Advanced & FI Integration | 3/3 | Complete    | 2026-02-17 |
-| 11. Cross-Module Integration | 0/TBD | Not started | - |
+| 11. Cross-Module Integration | 0/3 | Not started | - |
 | 12. Solution Design Intelligence | 0/TBD | Not started | - |
