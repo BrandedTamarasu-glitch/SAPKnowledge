@@ -38,6 +38,7 @@ VALID_CONTENT_TYPES = {
     "index", "tcodes", "config-spro", "processes", "master-data",
     "integration", "patterns", "e2e-process", "lookup-table",
     "account-determination", "decision-trees-and-troubleshooting",
+    "playbooks", "checklists",
 }
 VALID_CONFIDENCE = {"high", "medium", "low"}
 
