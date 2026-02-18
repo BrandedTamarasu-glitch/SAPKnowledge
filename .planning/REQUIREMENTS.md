@@ -61,7 +61,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INTG-01**: MM→FI integration point documentation (goods receipt/issue postings, invoice verification, OBYC mapping)
 - [ ] **INTG-02**: SD→FI integration point documentation (billing postings, revenue recognition, VKOA mapping)
 - [ ] **INTG-03**: CO→FI integration point documentation (cost element types, reconciliation ledger, real-time integration)
-- [ ] **INTG-04**: MM↔SD integration point documentation (availability check, goods issue for delivery, returns)
+- [x] **INTG-04**: MM↔SD integration point documentation (availability check, goods issue for delivery, returns)
 
 ### End-to-End Processes
 
@@ -143,7 +143,7 @@ Requirements for initial release. Each maps to roadmap phases.
 | CO-06 | Phase 10 | Pending |
 | CO-07 | Phase 10 | Pending |
 | INTG-03 | Phase 10 | Pending |
-| INTG-04 | Phase 11 | Pending |
+| INTG-04 | Phase 11 | Complete |
 | E2E-01 | Phase 11 | Pending |
 | E2E-02 | Phase 11 | Pending |
 | E2E-03 | Phase 11 | Pending |
