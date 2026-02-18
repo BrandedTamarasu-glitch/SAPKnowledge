@@ -138,3 +138,119 @@ Return Order (VA01 RE) -> Return Delivery (VL01N LR) -> GR (651, MKPF/MSEG) -> C
 ```
 
 See `modules/sd/processes.md` Section 2 (Returns) for the full SD-side process narrative.
+
+---
+
+## Consignment
+
+Consignment is a multi-step MM-SD process where stock is placed at the customer site but remains company-owned until the customer withdraws it. Each step has distinct movement types and different billing implications. Customer consignment stock is tracked in MM at the storage location level with special stock indicator W.
+
+### Consignment Movement Types
+
+| Step | Doc Type | Movement Type | Stock Change | Billing | Revenue |
+|------|----------|---------------|-------------|---------|---------|
+| Fill-Up | KB | 631 | Unrestricted -> consignment at customer (W) | No | No -- goods still company-owned |
+| Issue | KE | 633 | Consignment at customer -> sold | Yes | Yes -- revenue recognition point |
+| Returns | KA | 634 | Returned after issue -> consignment at customer | Credit memo | Reverses revenue |
+| Pickup | KR | 632 | Consignment at customer -> unrestricted | No | No -- goods returned to own stock |
+
+### Integration Handoffs
+
+- **Fill-Up (631):** SD order type KB triggers delivery and PGI with movement type 631. MM reduces unrestricted stock and creates consignment stock at the customer (special stock W). No FI revenue posting -- the goods remain on the company's balance sheet as inventory. No billing document.
+
+- **Issue (633):** SD order type KE triggers the critical handoff. Movement type 633 removes consignment stock at the customer. This is the revenue recognition point -- billing occurs, creating an FI document via VKOA (Dr Customer / Cr Revenue). OBYC posts Dr COGS / Cr Inventory for the cost side.
+
+- **Returns (634):** SD order type KA returns goods that were previously issued (633). Movement type 634 puts stock back into consignment at customer. Credit memo reverses the revenue posting.
+
+- **Pickup (632):** SD order type KR retrieves unsold consignment stock. Movement type 632 moves stock from consignment at customer back to unrestricted. No billing, no revenue impact.
+
+> **Key integration point:** Billing and revenue recognition occur ONLY on consignment issue (633). All other consignment movements are inventory reclassifications with no revenue impact. This is the critical handoff between MM inventory management and SD billing.
+
+See `modules/sd/processes.md` Section 6 (Consignment) for the SD-side process narrative.
+
+---
+
+## Stock Transport Orders (STO)
+
+Stock transport orders use a purchase order (PO type UB) to transfer stock between plants. When the plants are in different company codes, intercompany billing is triggered through SD.
+
+### Basic Flow
+
+- **PO creation:** ME21N with document type UB. Receiving plant creates PO against the supplying plant.
+- **Goods issue at sending plant:** Movement type 641 reduces stock at the issuing plant.
+- **Goods receipt at receiving plant:** Movement type 101 increases stock at the receiving plant.
+
+### Variants
+
+| Variant | Steps | In-Transit Stock | SD Involvement |
+|---------|-------|-----------------|----------------|
+| One-step (direct) | Single posting: 641 GI + 101 GR simultaneously | No | No |
+| Two-step (with in-transit) | Separate GI (641) and GR (101) | Yes -- stock in transit between postings | No |
+| Delivery-based STO | SD delivery document (VL10B) created for shipping leg | Depends on config | Yes -- delivery note for transportation |
+
+### Cross-Company-Code STO
+
+When the sending and receiving plants belong to different company codes, the STO triggers intercompany billing:
+
+- The supplying plant ships via an SD delivery document
+- Intercompany billing creates an invoice between the two company codes
+- FI documents are created in both company codes (intercompany receivable/payable)
+
+See `modules/mm/processes.md` for procurement-side STO detail. See `modules/sd/sd-advanced.md` Example 8 for the intercompany billing FI posting.
+
+---
+
+## Third-Party Processing
+
+In third-party processing, the company takes the customer order in SD but the vendor ships directly to the customer. No goods movement passes through the company's own warehouse.
+
+### Integration Flow
+
+1. **SD order** (VA01): Item category TAS (third-party) is determined. System automatically creates a purchase requisition in MM.
+2. **MM purchase order** (ME21N): Buyer converts the auto-generated PR to a PO. Delivery address on the PO is the customer's ship-to address.
+3. **Vendor ships directly to customer:** No delivery document created in SD. No MIGO goods receipt against own inventory.
+4. **Vendor invoice** (MIRO): AP Accountant posts the vendor invoice. Goods receipt is statistical -- no physical inventory movement at the company's plant.
+5. **Customer billing** (VF01): Order-related billing (not delivery-related). FI posts Dr Customer / Cr Revenue via VKOA.
+
+### Key Integration Points
+
+- **No inventory posting:** Movement types 101/601 do NOT fire. There is no stock in the company's warehouse. Only financial postings occur.
+- **SD triggers MM:** The sales order automatically creates the purchase requisition -- this is the SD-to-MM handoff.
+- **Two independent invoices:** MIRO for the vendor (MM -> FI); VF01 for the customer (SD -> FI). The margin is the difference.
+
+See `modules/sd/processes.md` Section 7 (Third-Party Processing) for the full SD-side narrative.
+
+---
+
+## Subcontracting (SD Triggers MM)
+
+When an SD sales order creates demand for a finished good that requires subcontracting, MRP generates a subcontracting purchase requisition. The company sends components to the subcontractor and receives finished goods back.
+
+### Integration Flow
+
+1. **SD order** creates demand for the finished good
+2. **MRP** (MD01/MD02) generates a subcontracting PR based on the material's procurement type and special procurement key
+3. **Component transfer** (movement type 541): Components sent to subcontractor. Stock reclassified from unrestricted to subcontracting stock (special stock O). No FI posting -- this is a stock type change, not a valuation event.
+4. **Finished goods receipt** (MIGO, movement type 101 against subcontracting PO): Finished goods received into inventory. Simultaneously, movement type 543 fires automatically to consume the components from subcontracting stock.
+
+### FI Postings
+
+- **541 (components out):** No FI posting. Stock reclassification only.
+- **101 (finished goods in):** Dr Inventory (BSX) / Cr GR/IR Clearing (WRX) -- standard GR posting
+- **543 (component consumption, automatic):** Dr Subcontracting Consumption (GBB/VBO) / Cr Inventory (BSX) -- components consumed
+
+See `modules/mm/processes.md` for procurement-side subcontracting detail. See `modules/mm/mm-advanced.md` Example 4 for the full 541/543 worked example with Dr/Cr entries.
+
+---
+
+## S/4HANA Differences
+
+| ECC 6 Behavior | S/4HANA Change | Impact on MM-SD Integration |
+|----------------|----------------|-----------------------------|
+| Basic ATP check (OVZ2 checking groups) | Advanced Available-to-Promise (aATP) available | Enhanced ATP with rule-based allocation, product substitution; basic ATP still works |
+| Material documents in MKPF/MSEG | Single MATDOC table | PGI (601), returns GR (651), consignment (631-634), STO (641) all write to MATDOC instead of MKPF/MSEG; same OBYC determination logic |
+| Consignment movement types 631-634 | Same movement types | Underlying tables change (MATDOC); business process and billing trigger unchanged |
+| STO with optional SD delivery | Delivery-based STO enhanced with Advanced Shipping | More shipping options; basic STO logic unchanged |
+| Third-party item category TAS | Same item category | Fiori apps available for approval workflows; core process unchanged |
+| Subcontracting movement types 541/543 | Same movement types | MATDOC replaces MKPF/MSEG; component consumption logic unchanged |
+| NACE output for delivery notes | BRF+ output management | Delivery note output framework changes; PGI posting unchanged |
