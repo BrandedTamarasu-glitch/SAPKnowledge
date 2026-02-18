@@ -22,5 +22,6 @@ last_verified: 2026-02-16
 | File | Contains | Read When |
 |------|----------|-----------|
 | @procure-to-pay.md | P2P process flow (MM + FI) | Procurement through payment questions |
-| @order-to-cash.md | O2C process flow (SD + FI) | Sales through revenue recognition questions |
-| @record-to-report.md | R2R process flow (FI + CO) | Financial close and reporting questions |
+| @order-to-cash.md | O2C process flow (SD + FI + MM) | Sales through revenue recognition questions |
+| @record-to-report.md | R2R period-end close (MM + SD + CO + FI) | Period-end close sequence, month-end ordering, cross-module reconciliation |
+| @mm-sd-integration.md | MM-SD integration points (ATP, PGI, returns, consignment, STO) | MM-SD interaction questions, availability check, goods issue for delivery |

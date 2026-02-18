@@ -13,6 +13,8 @@ When asked about SAP ECC 6, use this table to find the right files.
 | Cost centers, internal orders, profit centers, allocations | CO | `modules/co/CLAUDE.md` |
 | Account determination, OBYC, VKOA | Integration | `cross-module/` + module `integration.md` |
 | E2E processes (P2P, O2C, R2R) | Cross-module | `cross-module/` |
+| Period-end close, month-end, year-end, R2R sequence | Cross-module | `cross-module/CLAUDE.md` |
+| Availability check, ATP, goods issue for delivery, MM-SD | Cross-module | `cross-module/CLAUDE.md` |
 | Movement types, document types, posting keys | Reference | `reference/` |
 
 ## How to Use

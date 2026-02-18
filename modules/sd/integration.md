@@ -249,3 +249,10 @@ Recommended period-end sequence for SD-FI:
 | Material Ledger optional | Material Ledger mandatory | COGS at PGI may use actual cost instead of standard |
 | NACE output for billing | BRF+ output management | Billing output format changes; FI posting unchanged |
 | FD32 classic credit management | FSCM/UKM credit management | New credit engine; billing-FI posting unchanged |
+
+---
+
+## See Also
+
+- `cross-module/order-to-cash.md` -- Full O2C end-to-end flow (SD + FI + MM)
+- `cross-module/mm-sd-integration.md` -- MM-SD integration points (ATP, PGI, returns, consignment, STO)

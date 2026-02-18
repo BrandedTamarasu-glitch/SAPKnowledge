@@ -250,3 +250,9 @@ Cross-reference: For the detailed CO period-end sequence (9-step with dependenci
 | Category 22 external settlement creates FI doc | Same mechanism | No change to settlement-FI flow |
 
 > **Summary of S/4HANA impact on CO-FI integration:** The fundamental FI->CO real-time integration is unchanged — P&L postings still create CO documents via cost elements. The CO->FI direction (settlement with category 22) is also unchanged. The major eliminations are the reconciliation ledger (KALC) and the PCA separate ledger (GLPCA), both made unnecessary by the Universal Journal. For consultants migrating from ECC to S/4: the integration concepts transfer directly, but the reconciliation and PCA reconciliation steps disappear from period-end procedures.
+
+---
+
+## See Also
+
+- `cross-module/record-to-report.md` -- Full R2R end-to-end flow with cross-module period-end ordering

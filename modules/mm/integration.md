@@ -248,3 +248,10 @@ Recommended period-end sequence for MM-FI:
 | Classic GL or New GL | Universal Journal (ACDOCA) | All MM-FI postings go to ACDOCA |
 | F.13 for GR/IR clearing | Same F.13 process | No change in clearing logic |
 | MMPV period control | Same MMPV process | No change |
+
+---
+
+## See Also
+
+- `cross-module/procure-to-pay.md` -- Full P2P end-to-end flow (MM + FI)
+- `cross-module/mm-sd-integration.md` -- MM-SD integration points (ATP, PGI, returns, consignment, STO)
