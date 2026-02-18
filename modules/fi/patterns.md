@@ -9,26 +9,4 @@ last_verified: 2026-02-16
 
 # Financial Accounting - Solution Design Patterns
 
-> ECC 6.0 specific. For S/4HANA differences, see the S/4HANA Differences section below.
-
-## Quick Reference
-
-[To be populated in Phase 3]
-
-## Detail
-
-[To be populated in Phase 3]
-
-## Integration Points
-
-[To be populated in Phase 3]
-
-## Common Scenarios
-
-[To be populated in Phase 3]
-
-## S/4HANA Differences
-
-| ECC 6 Behavior | S/4HANA Change | Impact |
-|----------------|----------------|--------|
-| [To be populated] | | |
+Cross-module solution design patterns covering FI scenarios are documented in `cross-module/design-patterns.md`.

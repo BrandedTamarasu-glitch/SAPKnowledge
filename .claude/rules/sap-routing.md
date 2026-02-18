@@ -15,6 +15,9 @@ When asked about SAP ECC 6, use this table to find the right files.
 | E2E processes (P2P, O2C, R2R) | Cross-module | `cross-module/` |
 | Period-end close, month-end, year-end, R2R sequence | Cross-module | `cross-module/CLAUDE.md` |
 | Availability check, ATP, goods issue for delivery, MM-SD | Cross-module | `cross-module/CLAUDE.md` |
+| Solution design patterns, choosing SAP approach for business requirement | Cross-module | `cross-module/design-patterns.md` |
+| Scenario playbooks: consignment, intercompany, third-party, subcontracting, split valuation, batch, serial | Cross-module | `cross-module/playbooks.md` |
+| Month-end close checklist, year-end close checklist, period-end operator steps, T-codes for close | Cross-module | `cross-module/checklists.md` |
 | Movement types, document types, posting keys | Reference | `reference/` |
 
 ## How to Use
