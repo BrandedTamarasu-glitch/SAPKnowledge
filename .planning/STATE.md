@@ -2,21 +2,21 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-16)
+See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** Phase 12 active — Solution Design Intelligence. Plan 01 complete (design-patterns.md).
+**Current focus:** v1.1 milestone — MCP Server. Roadmap created. Phase 12 Plan 03 still pending (checklists.md). Phase 13 is next after Phase 12 completes.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.1 MCP Server milestone
-Last activity: 2026-02-23 — Milestone v1.1 started
+Phase: 12 (completing) / 13 (next)
+Plan: 12-03 pending, then Phase 13 planning
+Status: v1.1 roadmap defined — Phases 13/14/15 added. Phase 12 has one remaining plan.
+Last activity: 2026-02-23 — v1.1 milestone roadmap created (Phases 13, 14, 15)
 
 Progress: [██████████] 97%
 
-(37 known plans have SUMMARY.md)
+(37 known plans have SUMMARY.md; 3 v1.1 phases pending)
 
 ## Performance Metrics
 
@@ -134,17 +134,25 @@ Recent decisions affecting current work:
 - [Phase 12-solution-design-intelligence]: content_type set to 'patterns' (not 'design-patterns') to match validate.py expected types
 - [Phase 12]: Playbooks use cross-reference synthesis pattern — point to module files for config detail, add cross-module FI/CO perspective and test scenarios unavailable in single module files
 - [Phase 12]: validate.py updated to accept playbooks and checklists content types — pre-registering checklists prevents blocking issue in Plan 03
+- [v1.1 Roadmap]: MCP server implemented as Python + FastMCP (not TypeScript) — Python already in repo (validate.py), PyYAML installed, two new files in scripts/ vs new directory + build step for TypeScript
+- [v1.1 Roadmap]: Phase 13 groups all P1 tools (MCP-01/02/03/04/05/06/07/09/10) — shared infrastructure, all LOW complexity, no benefit to splitting
+- [v1.1 Roadmap]: MCP-08 (search_by_keyword) deferred to Phase 14 — P2 tool, add after observing P1 tool gaps
+- [v1.1 Roadmap]: MCP-11 (deployment docs) is Phase 15 — final deliverable, depends on server being complete and validated
+- [v1.1 Roadmap]: MCP server is read-only — never moves, renames, or transforms KB files; native CLAUDE.md loading path unchanged
+- [v1.1 Roadmap]: Tool descriptions must be written as LLM invocation conditions (MCP-09); section-level extraction enforced, no full file dumps (MCP-10)
 
 ### Pending Todos
 
-None yet.
+- Complete Phase 12 Plan 03 (checklists.md) before starting Phase 13
 
 ### Blockers/Concerns
 
 - Subagent directory permission issue: agents spawned from ~/Claude/General cannot write to ~/Claude/SAPKnowledge. Workaround: execute plans directly from orchestrator level.
+- v1.1 gap noted in SUMMARY.md: pin exact mcp package version before writing requirements.txt (floor-only spec is insufficient for production)
+- v1.1 gap: venv strategy must be decided before Phase 13 Plan 1 (affects .mcp.json absolute path and setup docs)
 
 ## Session Continuity
 
-Last session: 2026-02-18
-Stopped at: Completed 12-02-PLAN.md — playbooks.md with 8 cross-module scenario playbooks. Phase 12 Plan 2 complete.
+Last session: 2026-02-23
+Stopped at: v1.1 roadmap created — Phases 13, 14, 15 added to ROADMAP.md. Phase 12 Plan 03 still pending.
 Resume file: None

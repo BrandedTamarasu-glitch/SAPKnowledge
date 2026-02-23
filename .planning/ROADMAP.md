@@ -4,6 +4,8 @@
 
 This roadmap delivers a curated markdown knowledge base that transforms Claude Code into a reliable SAP ECC 6 solutioning assistant. Starting with foundational structure and FI (the integration backbone), expanding through core logistics modules (MM/SD), layering in cost accounting (CO), weaving cross-module integration, and culminating in solution design intelligence. Each phase delivers standalone value while building toward comprehensive ECC 6 reference coverage.
 
+v1.1 adds an MCP server layer on top of the v1.0 markdown KB, exposing it as callable tools to MCP-capable clients (Claude Code, Claude Desktop). The KB files are unchanged — the MCP server is a read-only consumer.
+
 ## Phases
 
 **Phase Numbering:**
@@ -24,6 +26,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: CO Advanced & FI Integration** - Cost element mapping, CO-FI reconciliation, decision trees (completed 2026-02-17)
 - [x] **Phase 11: Cross-Module Integration** - MM-SD integration, end-to-end process flows (completed 2026-02-18)
 - [ ] **Phase 12: Solution Design Intelligence** - Design patterns, scenario playbooks, operational checklists
+- [ ] **Phase 13: MCP Server Scaffold + P1 Tools** - Python FastMCP server, .mcp.json, five core query tools
+- [ ] **Phase 14: Keyword Search Tool** - Full-KB search_by_keyword with excerpt-based results
+- [ ] **Phase 15: Deployment Documentation** - Setup guide for non-developers: local and shared deployment
 
 ## Phase Details
 
@@ -227,10 +232,44 @@ Plans:
 - [ ] 12-02-PLAN.md — Playbooks (cross-module/playbooks.md): 8 scenario playbooks (4 process + 4 config) with full implementation walkthroughs
 - [ ] 12-03-PLAN.md — Checklists + navigation (cross-module/checklists.md, routing updates, module stub updates)
 
+### Phase 13: MCP Server Scaffold + P1 Tools
+**Goal**: MCP-capable clients can query the KB using five purpose-built tools covering the highest-frequency SAP consultant query patterns
+**Depends on**: Phase 12
+**Requirements**: MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, MCP-06, MCP-07, MCP-09, MCP-10
+**Success Criteria** (what must be TRUE):
+  1. Developer can install the MCP server by creating a venv, running pip install, and registering the server — no manual path hacking required
+  2. Claude Code and Claude Desktop auto-discover the server via .mcp.json at repo root and list its tools without extra configuration
+  3. User can call lookup_tcode with any MM/SD/FI/CO T-code and receive its description, module, menu path, and usage context — sourced from section-level KB extraction, not full file dump
+  4. User can call get_module_overview, get_config_path, get_process_flow, and compare_ecc_s4 and receive targeted KB excerpts scoped to the query (not full file bodies)
+  5. All five tool descriptions route correctly when tested against 10 representative SAP queries in MCP Inspector — no tool is invoked for queries outside its scope
+**Plans:** TBD
+
+### Phase 14: Keyword Search Tool
+**Goal**: Users can search the full KB by keyword and receive ranked excerpts with source attribution when no specific P1 tool matches their query
+**Depends on**: Phase 13
+**Requirements**: MCP-08
+**Success Criteria** (what must be TRUE):
+  1. User can call search_by_keyword with a free-text query and receive matching excerpts (3-5 lines each) with source module and file path for each result
+  2. Search results never return full file bodies — response stays within the 2000-token per-tool budget even for broad queries
+  3. Search covers all KB content under modules/, cross-module/, and reference/ — and only those directories (no .planning/, .claude/, or scripts/ exposure)
+  4. When a keyword matches no KB content, the tool returns a clear "no results" response rather than an error or empty response
+**Plans:** TBD
+
+### Phase 15: Deployment Documentation
+**Goal**: A non-developer colleague can configure the MCP server in both Claude Code and Claude Desktop by following the setup guide, without needing to understand Python packaging or MCP internals
+**Depends on**: Phase 14
+**Requirements**: MCP-11
+**Success Criteria** (what must be TRUE):
+  1. Setup guide covers venv creation, pip install, and .mcp.json configuration for Claude Code in a numbered step sequence a non-developer can follow
+  2. Setup guide covers Claude Desktop config file location and JSON snippet for all three platforms (macOS, Windows, Linux)
+  3. Setup guide includes a verification step the user can run to confirm the server is discoverable before opening Claude
+  4. A reader with no Python background can complete local setup in under 15 minutes following only the guide
+**Plans:** TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -246,3 +285,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 10. CO Advanced & FI Integration | 3/3 | Complete    | 2026-02-17 |
 | 11. Cross-Module Integration | 3/3 | Complete    | 2026-02-18 |
 | 12. Solution Design Intelligence | 2/3 | In Progress|  |
+| 13. MCP Server Scaffold + P1 Tools | 0/TBD | Not started | - |
+| 14. Keyword Search Tool | 0/TBD | Not started | - |
+| 15. Deployment Documentation | 0/TBD | Not started | - |
