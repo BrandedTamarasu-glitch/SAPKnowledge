@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Cross-Module Integration** - MM-SD integration, end-to-end process flows (completed 2026-02-18)
 - [ ] **Phase 12: Solution Design Intelligence** - Design patterns, scenario playbooks, operational checklists
 - [x] **Phase 13: MCP Server Scaffold + P1 Tools** - Python FastMCP server, .mcp.json, five core query tools (completed 2026-02-23)
-- [ ] **Phase 14: Keyword Search Tool** - Full-KB search_by_keyword with excerpt-based results
+- [x] **Phase 14: Keyword Search Tool** - Full-KB search_by_keyword with excerpt-based results (completed 2026-02-23)
 - [ ] **Phase 15: Deployment Documentation** - Setup guide for non-developers: local and shared deployment
 
 ## Phase Details
@@ -257,7 +257,7 @@ Plans:
   2. Search results never return full file bodies — response stays within the 2000-token per-tool budget even for broad queries
   3. Search covers all KB content under modules/, cross-module/, and reference/ — and only those directories (no .planning/, .claude/, or scripts/ exposure)
   4. When a keyword matches no KB content, the tool returns a clear "no results" response rather than an error or empty response
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 14-01-PLAN.md — search_kb() helper in kb_reader.py + search_by_keyword tool in mcp_server.py
@@ -293,5 +293,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 11. Cross-Module Integration | 3/3 | Complete    | 2026-02-18 |
 | 12. Solution Design Intelligence | 2/3 | In Progress|  |
 | 13. MCP Server Scaffold + P1 Tools | 2/2 | Complete    | 2026-02-23 |
-| 14. Keyword Search Tool | 0/1 | Not started | - |
+| 14. Keyword Search Tool | 1/1 | Complete   | 2026-02-23 |
 | 15. Deployment Documentation | 0/TBD | Not started | - |

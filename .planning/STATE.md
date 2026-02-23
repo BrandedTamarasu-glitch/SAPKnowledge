@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** v1.1 milestone — MCP Server. Phase 13 complete (kb_reader.py + mcp_server.py + .mcp.json). Next: Phase 14 (MCP-08 search_by_keyword).
+**Current focus:** v1.1 milestone — MCP Server. Phase 14 complete (search_by_keyword tool added). Next: Phase 15 (deployment documentation).
 
 ## Current Position
 
-Phase: 13
-Plan: 13-02 (complete)
-Status: Phase 13 complete — all P1 tools delivered; mcp_server.py with five tools + .mcp.json registered; .venv/ provisioned with fastmcp==3.0.2.
-Last activity: 2026-02-23 — Phase 13 Plan 02 executed (mcp_server.py + .mcp.json)
+Phase: 14
+Plan: 14-01 (complete)
+Status: Phase 14 complete — search_by_keyword MCP tool delivered; mcp_server.py now has 6 tools (5 P1 + 1 P2); MCP-08 requirement fulfilled.
+Last activity: 2026-02-23 — Phase 14 Plan 01 executed (search_kb() + search_by_keyword())
 
-Progress: [██████████] 98%
+Progress: [██████████] 99%
 
-(39 known plans have SUMMARY.md; Phases 14/15 pending)
+(40 known plans have SUMMARY.md; Phase 15 pending)
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [██████████] 98%
 | Phase 12-solution-design-intelligence P01 | 5 | 1 tasks | 1 files |
 | Phase 12 P02 | 15 | 2 tasks | 2 files |
 | Phase 13-mcp-server P01 | 2 | 2 tasks | 3 files |
+| Phase 14-keyword-search-tool P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -147,10 +148,12 @@ Recent decisions affecting current work:
 - [Phase 13-02]: No print() calls in mcp_server.py — stdout is MCP protocol wire; print() absence verified via AST (not raw text) to avoid comment false positives
 - [Phase 13-02]: compare_ecc_s4 reads DISAMBIGUATION_FILE directly via parse_frontmatter (not get_file_body) — disambiguation file is not in modules/{module}/ path template
 - [Phase 13-02]: _tool_manager internal API not present in FastMCP 3.0.2 — tool verification uses import + functional smoke tests instead
+- [Phase 14-keyword-search-tool]: search_kb() returns tuple (list[dict], int) — both values used by mcp_server to show truncation note when total > cap
+- [Phase 14-keyword-search-tool]: [Phase 14-01]: search_by_keyword tool docstring follows MCP-09 pattern with explicit P1 tool list for accurate LLM routing as last-resort fallback
 
 ### Pending Todos
 
-- Execute Phase 14 Plan 01 (MCP-08 search_by_keyword tool)
+- Execute Phase 15 Plan 01 (MCP-11 deployment documentation)
 
 ### Blockers/Concerns
 
@@ -159,5 +162,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 13-mcp-server-scaffold-p1-tools/13-02-PLAN.md (mcp_server.py + .mcp.json + .venv/)
+Stopped at: Completed 14-keyword-search-tool/14-01-PLAN.md (search_by_keyword tool + search_kb helper)
 Resume file: None

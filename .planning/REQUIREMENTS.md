@@ -20,7 +20,7 @@ Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
 - [x] **MCP-05**: User can retrieve SPRO/IMG configuration path and steps for a given module + topic
 - [x] **MCP-06**: User can retrieve a step-by-step process flow for a named SAP business process
 - [x] **MCP-07**: User can compare ECC 6 vs S/4HANA behavior for a given topic or feature
-- [ ] **MCP-08**: User can search the full KB by keyword and get matching excerpts with source module/file
+- [x] **MCP-08**: User can search the full KB by keyword and get matching excerpts with source module/file
 
 ### Tool Design Quality
 
@@ -150,7 +150,7 @@ Requirements for initial release (v1.0 — all shipped).
 | MCP-05 | Phase 13 | Complete |
 | MCP-06 | Phase 13 | Complete |
 | MCP-07 | Phase 13 | Complete |
-| MCP-08 | Phase 14 | Pending |
+| MCP-08 | Phase 14 | Complete |
 | MCP-09 | Phase 13 | Complete |
 | MCP-10 | Phase 13 | Complete |
 | MCP-11 | Phase 15 | Pending |
