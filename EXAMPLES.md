@@ -635,6 +635,223 @@ def parse_search_response(text: str) -> list[dict]:
 
 ---
 
+---
+
+## Example 9: CO Month-End Close — Extract and Look Up All Required T-codes
+
+Parses the CO period-end closing sequence from `processes.md`, extracts every T-code (including composite entries like `KSU5/KSV5` and `OKP1 / COPI`), looks each one up in `tcodes.md` for menu path, usage, and gotchas, and falls back to `search_kb` for T-codes without a dedicated entry.
+
+```python
+import sys
+import re
+sys.path.insert(0, "scripts")
+
+from kb_reader import (
+    get_file_body, find_section_by_topic, extract_tcode_section,
+    search_kb, TCODE_FILE, PROCESS_FILE,
+)
+
+# --- Step 1: Load CO process and T-code files ---
+process_body, process_source = get_file_body(PROCESS_FILE, "CO")
+tcode_body,   tcode_source   = get_file_body(TCODE_FILE,   "CO")
+
+
+# --- Step 2: Locate the period-end closing sequence section ---
+close_section = find_section_by_topic(process_body, "Period-End CO Closing Sequence")
+if close_section is None:
+    raise ValueError("Month-end close section not found in modules/co/processes.md")
+
+
+# --- Step 3: Parse the sequence table ---
+# Table columns: Step | Activity | T-code | Purpose | Dependencies
+TABLE_ROW_RE = re.compile(
+    r"^\|\s*([^|\-][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|",
+    re.MULTILINE,
+)
+
+steps = []
+for match in TABLE_ROW_RE.finditer(close_section):
+    step_raw, activity, tcode_raw, purpose, dependencies = match.groups()
+    step = step_raw.strip()
+    # Skip header and separator rows
+    if step.lower() == "step" or not step:
+        continue
+    steps.append({
+        "step":         step,
+        "activity":     activity.strip(),
+        "tcode_raw":    tcode_raw.strip(),
+        "purpose":      purpose.strip(),
+        "dependencies": dependencies.strip(),
+    })
+
+
+# --- Step 4: Normalize T-codes (split "KSU5/KSV5", "OKP1 / COPI", etc.) ---
+def split_tcodes(raw: str) -> list[str]:
+    """
+    Split composite T-code strings into a clean list.
+    Handles: "KSU5/KSV5"  "OKP1 / COPI"  "KKAX/KKA2"  "KO88"
+    """
+    # Split on whitespace, slash, or comma
+    parts = re.split(r"[\s/,]+", raw)
+    # Keep only valid T-code-shaped tokens (2–8 uppercase alphanum chars)
+    return [p.strip().upper() for p in parts if re.match(r"^[A-Z0-9_]{2,10}$", p.strip())]
+
+
+# --- Step 5: Look up each T-code with a graceful fallback ---
+def lookup_tcode_details(tcode: str) -> dict:
+    """
+    Primary:  extract_tcode_section() on CO tcodes.md.
+    Fallback: search_kb() across all KB files.
+    Returns a dict with tcode, found, menu_path, usage, gotcha, source.
+    """
+    base = {"tcode": tcode, "menu_path": "", "usage": "", "gotcha": ""}
+
+    # --- Primary: dedicated tcodes.md entry ---
+    section = extract_tcode_section(tcode_body, tcode)
+    if section:
+        for line in section.splitlines():
+            if line.startswith("**Menu Path:**"):
+                base["menu_path"] = line.replace("**Menu Path:**", "").strip()
+            elif line.startswith("**Usage:**"):
+                base["usage"] = line.replace("**Usage:**", "").strip()
+            elif line.startswith("**Gotcha:**"):
+                base["gotcha"] = line.replace("**Gotcha:**", "").strip()
+        return {**base, "found": True, "source": tcode_source}
+
+    # --- Fallback: keyword search ---
+    results, _ = search_kb(f"{tcode} CO controlling period-end", max_results=3)
+    if results:
+        r = results[0]
+        return {
+            **base,
+            "found":     True,
+            "usage":     r["excerpt"][:200],
+            "menu_path": "(found via search — no dedicated tcode entry)",
+            "source":    r["source"],
+        }
+
+    return {**base, "found": False, "source": ""}
+
+
+# --- Step 6: Build the enriched close checklist ---
+def build_close_checklist() -> list[dict]:
+    """
+    Returns every CO month-end close step enriched with full T-code details.
+    """
+    checklist = []
+    for step in steps:
+        tcodes = split_tcodes(step["tcode_raw"])
+        checklist.append({
+            **step,
+            "tcodes": [lookup_tcode_details(t) for t in tcodes],
+        })
+    return checklist
+
+
+# === Run and print ===
+checklist = build_close_checklist()
+
+# Summary table
+print(f"{'Step':<5}  {'T-code(s)':<22}  {'Activity':<34}  {'KB?'}")
+print("-" * 70)
+for item in checklist:
+    tcode_str = " / ".join(t["tcode"] for t in item["tcodes"])
+    kb_flag   = "✓" if all(t["found"] for t in item["tcodes"]) else "?"
+    print(f"{item['step']:<5}  {tcode_str:<22}  {item['activity'][:33]:<34}  {kb_flag}")
+
+# Full T-code reference
+print("\n" + "=" * 70)
+print("CO MONTH-END CLOSE — FULL T-CODE REFERENCE")
+print("=" * 70)
+
+for item in checklist:
+    print(f"\n── Step {item['step']}: {item['activity']}")
+    print(f"   Purpose:      {item['purpose']}")
+    print(f"   Depends on:   {item['dependencies']}")
+    for t in item["tcodes"]:
+        if t["found"]:
+            print(f"\n   {t['tcode']}")
+            print(f"   Menu:    {t['menu_path'] or '(not in KB)'}")
+            print(f"   Usage:   {t['usage'][:120] or '(not in KB)'}")
+            if t["gotcha"]:
+                print(f"   ⚠ Note:  {t['gotcha'][:120]}")
+            print(f"   Source:  {t['source']}")
+        else:
+            print(f"\n   {t['tcode']}  ⚠ Not found in KB — verify manually")
+```
+
+**Expected summary output:**
+```
+Step   T-code(s)               Activity                             KB?
+----------------------------------------------------------------------
+1      KB61                    Repost CO line items                  ✓
+2      KGI2                    Calculate actual overhead             ✓
+3      KSU5                    Run assessment cycles                 ✓
+4      KSV5                    Run distribution cycles               ✓
+5      KO88                    Settle internal orders                ✓
+6      CO88                    Settle production orders              ✓
+6a     KKAX / KKA2             WIP/Results analysis                  ?
+7      KSII                    Calculate actual activity prices      ✓
+8      1KEG                    Transfer pricing (PCA)                ?
+9      OKP1 / COPI             Lock CO period                        ?
+```
+
+T-codes marked `?` are not in CO `tcodes.md` but are found via `search_kb` fallback — the code still returns useful context from whichever KB file mentions them.
+
+**Using the MCP server instead (equivalent queries via fastmcp client):**
+
+```python
+import asyncio
+from fastmcp import Client
+
+async def get_co_close_tcodes_via_mcp():
+    async with Client("scripts/mcp_server.py") as client:
+
+        # Get the full CO period-end process (includes the sequence table)
+        process_result = await client.call_tool("get_process_flow", {
+            "module": "CO",
+            "process": "period-end close"
+        })
+        process_text = process_result.content[0].text
+        print("=== CO Period-End Sequence ===")
+        print(process_text[:2000])
+
+        # Look up core period-end T-codes individually for full details
+        core_tcodes = ["KB61", "KGI2", "KSU5", "KSV5", "KO88", "CO88", "KSII"]
+        for tcode in core_tcodes:
+            result = await client.call_tool("lookup_tcode", {"tcode": tcode})
+            text = result.content[0].text
+            # Extract just the first 3 lines (heading + usage)
+            summary = "\n".join(text.splitlines()[:4])
+            print(f"\n── {tcode}\n{summary}")
+
+        # Search for less common close T-codes not in tcodes.md
+        for tcode in ["KKAX", "1KEG", "COPI"]:
+            results = await client.call_tool("search_by_keyword", {
+                "query": f"{tcode} CO period-end controlling"
+            })
+            text = results.content[0].text
+            # First result line is the source and heading
+            first_line = text.strip().splitlines()[0] if text.strip() else "No results"
+            print(f"\n── {tcode} (search fallback): {first_line}")
+
+asyncio.run(get_co_close_tcodes_via_mcp())
+```
+
+---
+
+## Key Files for CO Month-End Close
+
+| File | Contents |
+|------|----------|
+| `modules/co/processes.md` | CO business process flows including the **9-step period-end closing sequence** (KB61 → KGI2 → KSU5/KSV5 → KO88/CO88 → KSII → lock) with dependency rules |
+| `modules/co/tcodes.md` | ~63 CO T-codes: KB61, KGI2, KSU5, KSV5, KO88, CO88, KSII and all master data / reporting T-codes with menu paths, usage, gotchas |
+| `modules/co/co-advanced.md` | 10 troubleshooting symptoms for period-end failures (zero allocations, missing settlement rules, KE5Z vs FI reconciliation gaps) |
+| `modules/co/integration.md` | CO-FI integration catalog: which CO T-codes create FI documents (only KO88 with KST/FXA receiver and KALC); CO-internal-only T-codes (no FI impact) |
+| `cross-module/record-to-report.md` | Full R2R end-to-end close sequence: FI period-end → MM period-end → CO period-end with cross-module timing dependencies |
+
+---
+
 ## Key Files for FI Account Determination
 
 | File | Contents |
