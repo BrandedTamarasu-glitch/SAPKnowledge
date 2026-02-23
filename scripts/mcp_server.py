@@ -18,6 +18,7 @@ from kb_reader import (
     find_section_by_topic,
     extract_disambiguation_rows,
     parse_frontmatter,
+    search_kb,           # Phase 14: keyword search helper
     KB_ROOT,
     TCODE_FILE,
     OVERVIEW_FILE,
@@ -135,6 +136,49 @@ def compare_ecc_s4(topic: str) -> str:
         f"cost elements, profit center accounting, segment reporting, business area. "
         f"Source: {source}"
     )
+
+
+@mcp.tool
+def search_by_keyword(query: str) -> str:
+    """Use this tool ONLY when the user asks a general SAP ECC 6 question that
+    cannot be answered by any of the specific tools: lookup_tcode (for T-code
+    names), get_config_path (for SPRO/IMG configuration), get_process_flow (for
+    step-by-step business processes), get_module_overview (for module content
+    index), or compare_ecc_s4 (for ECC vs S/4HANA differences). Use
+    search_by_keyword as a last-resort fallback when the query is open-ended —
+    for example: 'what is GR/IR clearing?', 'find content about tolerance keys',
+    'show me everything about consignment stock'. Do NOT use for specific T-code
+    lookups or SPRO path queries — use the specialized tools for those."""
+    if not query.strip():
+        return (
+            "Please provide a keyword or phrase to search. "
+            "Example: 'GR/IR clearing', 'tolerance keys', 'consignment stock'."
+        )
+
+    results, total = search_kb(query.strip())
+
+    if not results:
+        return (
+            f"No results found for '{query}' in the SAP ECC 6 KB. "
+            f"This KB covers MM, SD, FI, CO modules and cross-module processes. "
+            f"Try rephrasing with a key term (T-code, config path, or process name). "
+            f"For T-code lookup: use lookup_tcode. For SPRO paths: use get_config_path."
+        )
+
+    parts = []
+    for r in results:
+        section = f"{r['heading']}\n\n{r['excerpt']}\n\nSource: {r['source']}"
+        parts.append(section)
+
+    output = "\n\n---\n\n".join(parts)
+
+    if total > len(results):
+        output += (
+            f"\n\n---\n\nShowing {len(results)} of {total}+ matches. "
+            f"Refine your query for more targeted results."
+        )
+
+    return output
 
 
 if __name__ == "__main__":
