@@ -1,11 +1,39 @@
 # Requirements: SAP ECC 6 Knowledge Base
 
 **Defined:** 2026-02-16
+**Updated:** 2026-02-23 (v1.1 milestone)
 **Core Value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
+
+## v1.1 Requirements
+
+Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
+
+### MCP Server Infrastructure
+
+- [ ] **MCP-01**: Developer can install the MCP server using standard Python tooling (venv + pip install)
+- [ ] **MCP-02**: MCP server runs via stdio transport registered at repo root (`.mcp.json`) for Claude Code + Claude Desktop
+
+### MCP Query Tools
+
+- [ ] **MCP-03**: User can look up any SAP T-code and get description, module, menu path, and usage context
+- [ ] **MCP-04**: User can get an overview of available KB content for a specific module (MM/SD/FI/CO)
+- [ ] **MCP-05**: User can retrieve SPRO/IMG configuration path and steps for a given module + topic
+- [ ] **MCP-06**: User can retrieve a step-by-step process flow for a named SAP business process
+- [ ] **MCP-07**: User can compare ECC 6 vs S/4HANA behavior for a given topic or feature
+- [ ] **MCP-08**: User can search the full KB by keyword and get matching excerpts with source module/file
+
+### Tool Design Quality
+
+- [ ] **MCP-09**: Each tool description is written as an invocation condition for reliable LLM routing (not a developer description)
+- [ ] **MCP-10**: Tool responses use section-level extraction (not full file content) to stay within context limits
+
+### Deployment
+
+- [ ] **MCP-11**: Setup documentation enables a non-developer to configure the MCP server in Claude Code and Claude Desktop
 
 ## v1 Requirements
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for initial release (v1.0 — all shipped).
 
 ### Foundation
 
@@ -22,9 +50,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **FI-02**: SPRO/IMG configuration paths for GL, AP, AR, and asset accounting with step-by-step guidance
 - [x] **FI-03**: Business process maps for record-to-report tied to specific transactions and config
 - [x] **FI-04**: Master data reference covering GL accounts, vendor master, customer master, asset master — key fields and relationships
-- [ ] **FI-05**: Account determination logic for automatic postings (integration with MM and SD)
-- [ ] **FI-06**: Configuration decision trees for common FI scenarios (parallel accounting, payment terms, dunning)
-- [ ] **FI-07**: Common FI gotchas and troubleshooting guide specific to ECC 6
+- [x] **FI-05**: Account determination logic for automatic postings (integration with MM and SD)
+- [x] **FI-06**: Configuration decision trees for common FI scenarios (parallel accounting, payment terms, dunning)
+- [x] **FI-07**: Common FI gotchas and troubleshooting guide specific to ECC 6
 
 ### MM — Materials Management
 
@@ -42,9 +70,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SD-02**: SPRO/IMG configuration paths for sales, shipping, billing, and pricing with step-by-step guidance
 - [x] **SD-03**: Business process maps for order-to-cash tied to specific transactions and config
 - [x] **SD-04**: Master data reference covering customer master, material master (sales views), pricing conditions, output determination — key fields and relationships
-- [ ] **SD-05**: Account determination walkthrough for SD (VKOA) — billing document to GL account mapping
-- [ ] **SD-06**: Configuration decision trees for common SD scenarios (pricing procedures, copy control, partner determination, availability check)
-- [ ] **SD-07**: Common SD gotchas and troubleshooting guide specific to ECC 6
+- [x] **SD-05**: Account determination walkthrough for SD (VKOA) — billing document to GL account mapping
+- [x] **SD-06**: Configuration decision trees for common SD scenarios (pricing procedures, copy control, partner determination, availability check)
+- [x] **SD-07**: Common SD gotchas and troubleshooting guide specific to ECC 6
 
 ### CO — Controlling
 
@@ -52,15 +80,15 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CO-02**: SPRO/IMG configuration paths for cost center accounting, profit center accounting, internal orders, and product costing with step-by-step guidance
 - [x] **CO-03**: Business process maps for cost allocation and settlement tied to specific transactions and config
 - [x] **CO-04**: Master data reference covering cost centers, profit centers, internal orders, cost elements, activity types — key fields and relationships
-- [ ] **CO-05**: Cost element mapping and CO-FI reconciliation walkthrough
-- [ ] **CO-06**: Configuration decision trees for common CO scenarios (allocation cycles, settlement rules, transfer pricing)
-- [ ] **CO-07**: Common CO gotchas and troubleshooting guide specific to ECC 6
+- [x] **CO-05**: Cost element mapping and CO-FI reconciliation walkthrough
+- [x] **CO-06**: Configuration decision trees for common CO scenarios (allocation cycles, settlement rules, transfer pricing)
+- [x] **CO-07**: Common CO gotchas and troubleshooting guide specific to ECC 6
 
 ### Integration
 
 - [x] **INTG-01**: MM→FI integration point documentation (goods receipt/issue postings, invoice verification, OBYC mapping)
-- [ ] **INTG-02**: SD→FI integration point documentation (billing postings, revenue recognition, VKOA mapping)
-- [ ] **INTG-03**: CO→FI integration point documentation (cost element types, reconciliation ledger, real-time integration)
+- [x] **INTG-02**: SD→FI integration point documentation (billing postings, revenue recognition, VKOA mapping)
+- [x] **INTG-03**: CO→FI integration point documentation (cost element types, reconciliation ledger, real-time integration)
 - [x] **INTG-04**: MM↔SD integration point documentation (availability check, goods issue for delivery, returns)
 
 ### End-to-End Processes
@@ -74,7 +102,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SOLN-01**: Solution design patterns mapping common business requirements to SAP ECC 6 capabilities with recommended configuration approach
 - [x] **SOLN-02**: Scenario playbooks for complex processes (consignment, intercompany sales, third-party processing, subcontracting)
 - [x] **SOLN-03**: Scenario playbooks for complex config (split valuation, special procurement, batch management, serial numbers)
-- [ ] **SOLN-04**: Operational checklists for month-end and year-end close across MM, SD, FI, CO
+- [x] **SOLN-04**: Operational checklists for month-end and year-end close across MM, SD, FI, CO
 
 ## v2 Requirements
 
@@ -90,6 +118,12 @@ Requirements for initial release. Each maps to roadmap phases.
 - **ADV-02**: Country-specific localization content (tax procedures, payment methods, dunning by country)
 - **ADV-03**: Authorization concept reference (authorization objects, roles, profiles per module)
 
+### Advanced MCP Tools
+
+- **MCP-A01**: `get_account_determination` tool — OBYC/VKOA decision chain across MM and FI files
+- **MCP-A02**: `get_scenario_playbook` tool — cross-module synthesis for complex scenario queries
+- **MCP-A03**: `get_decision_tree` tool — configuration decision guidance for complex SAP scenarios
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -97,66 +131,39 @@ Requirements for initial release. Each maps to roadmap phases.
 | S/4HANA how-to content | ECC 6 only — S/4 referenced only for disambiguation |
 | ABAP development reference | Focus is functional solutioning, not custom code |
 | Company-specific config values | General reference only, no internal system data |
-| MCP server infrastructure | Delivering as flat markdown, no server to maintain |
+| REST API / hosted endpoint | MCP server is local/org deployment via stdio, not a public HTTP API |
 | Exhaustive T-code lists | Curated 50-80 per module; exhaustive lists waste context and introduce accuracy risk |
 | SAP table/field-level documentation | Referenced inline only where needed, not standalone |
 | Screenshots or images | Markdown text only for Claude Code consumption |
+| Semantic search / embeddings | KB structure + keyword search covers 80%+ of patterns at a fraction of the complexity |
 
 ## Traceability
 
+### v1.1 Requirements
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Complete |
-| FOUND-02 | Phase 1 | Complete |
-| FOUND-05 | Phase 1 | Complete |
-| FOUND-06 | Phase 1 | Complete |
-| FOUND-03 | Phase 2 | Complete |
-| FOUND-04 | Phase 2 | Complete |
-| FI-01 | Phase 3 | Complete |
-| FI-02 | Phase 3 | Complete |
-| FI-03 | Phase 3 | Complete |
-| FI-04 | Phase 3 | Complete |
-| FI-05 | Phase 4 | Complete |
-| FI-06 | Phase 4 | Complete |
-| FI-07 | Phase 4 | Complete |
-| MM-01 | Phase 5 | Complete |
-| MM-02 | Phase 5 | Complete |
-| MM-03 | Phase 5 | Complete |
-| MM-04 | Phase 5 | Complete |
-| MM-05 | Phase 6 | Complete |
-| MM-06 | Phase 6 | Complete |
-| MM-07 | Phase 6 | Complete |
-| INTG-01 | Phase 6 | Complete |
-| SD-01 | Phase 7 | Complete |
-| SD-02 | Phase 7 | Complete |
-| SD-03 | Phase 7 | Complete |
-| SD-04 | Phase 7 | Complete |
-| SD-05 | Phase 8 | Complete |
-| SD-06 | Phase 8 | Complete |
-| SD-07 | Phase 8 | Complete |
-| INTG-02 | Phase 8 | Complete |
-| CO-01 | Phase 9 | Complete |
-| CO-02 | Phase 9 | Complete |
-| CO-03 | Phase 9 | Complete |
-| CO-04 | Phase 9 | Complete |
-| CO-05 | Phase 10 | Pending |
-| CO-06 | Phase 10 | Pending |
-| CO-07 | Phase 10 | Pending |
-| INTG-03 | Phase 10 | Pending |
-| INTG-04 | Phase 11 | Complete |
-| E2E-01 | Phase 11 | Complete |
-| E2E-02 | Phase 11 | Complete |
-| E2E-03 | Phase 11 | Complete |
-| SOLN-01 | Phase 12 | Complete |
-| SOLN-02 | Phase 12 | Complete |
-| SOLN-03 | Phase 12 | Complete |
-| SOLN-04 | Phase 12 | Pending |
+| MCP-01 | Phase 13 | Pending |
+| MCP-02 | Phase 13 | Pending |
+| MCP-03 | Phase 13 | Pending |
+| MCP-04 | Phase 13 | Pending |
+| MCP-05 | Phase 13 | Pending |
+| MCP-06 | Phase 13 | Pending |
+| MCP-07 | Phase 13 | Pending |
+| MCP-08 | Phase 14 | Pending |
+| MCP-09 | Phase 13 | Pending |
+| MCP-10 | Phase 13 | Pending |
+| MCP-11 | Phase 15 | Pending |
 
 **Coverage:**
-- v1 requirements: 42 total
-- Mapped to phases: 42
+- v1.1 requirements: 11 total
+- Mapped to phases: 11
 - Unmapped: 0 ✓
+
+### v1 Requirements
+
+All 42 v1 requirements complete ✓
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after roadmap creation*
+*Last updated: 2026-02-23 after v1.1 milestone start*
