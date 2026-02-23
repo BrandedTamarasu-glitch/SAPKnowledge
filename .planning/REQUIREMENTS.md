@@ -11,20 +11,20 @@ Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
 ### MCP Server Infrastructure
 
 - [x] **MCP-01**: Developer can install the MCP server using standard Python tooling (venv + pip install)
-- [ ] **MCP-02**: MCP server runs via stdio transport registered at repo root (`.mcp.json`) for Claude Code + Claude Desktop
+- [x] **MCP-02**: MCP server runs via stdio transport registered at repo root (`.mcp.json`) for Claude Code + Claude Desktop
 
 ### MCP Query Tools
 
-- [ ] **MCP-03**: User can look up any SAP T-code and get description, module, menu path, and usage context
-- [ ] **MCP-04**: User can get an overview of available KB content for a specific module (MM/SD/FI/CO)
-- [ ] **MCP-05**: User can retrieve SPRO/IMG configuration path and steps for a given module + topic
-- [ ] **MCP-06**: User can retrieve a step-by-step process flow for a named SAP business process
-- [ ] **MCP-07**: User can compare ECC 6 vs S/4HANA behavior for a given topic or feature
+- [x] **MCP-03**: User can look up any SAP T-code and get description, module, menu path, and usage context
+- [x] **MCP-04**: User can get an overview of available KB content for a specific module (MM/SD/FI/CO)
+- [x] **MCP-05**: User can retrieve SPRO/IMG configuration path and steps for a given module + topic
+- [x] **MCP-06**: User can retrieve a step-by-step process flow for a named SAP business process
+- [x] **MCP-07**: User can compare ECC 6 vs S/4HANA behavior for a given topic or feature
 - [ ] **MCP-08**: User can search the full KB by keyword and get matching excerpts with source module/file
 
 ### Tool Design Quality
 
-- [ ] **MCP-09**: Each tool description is written as an invocation condition for reliable LLM routing (not a developer description)
+- [x] **MCP-09**: Each tool description is written as an invocation condition for reliable LLM routing (not a developer description)
 - [x] **MCP-10**: Tool responses use section-level extraction (not full file content) to stay within context limits
 
 ### Deployment
@@ -144,14 +144,14 @@ Requirements for initial release (v1.0 — all shipped).
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MCP-01 | Phase 13 | Complete |
-| MCP-02 | Phase 13 | Pending |
-| MCP-03 | Phase 13 | Pending |
-| MCP-04 | Phase 13 | Pending |
-| MCP-05 | Phase 13 | Pending |
-| MCP-06 | Phase 13 | Pending |
-| MCP-07 | Phase 13 | Pending |
+| MCP-02 | Phase 13 | Complete |
+| MCP-03 | Phase 13 | Complete |
+| MCP-04 | Phase 13 | Complete |
+| MCP-05 | Phase 13 | Complete |
+| MCP-06 | Phase 13 | Complete |
+| MCP-07 | Phase 13 | Complete |
 | MCP-08 | Phase 14 | Pending |
-| MCP-09 | Phase 13 | Pending |
+| MCP-09 | Phase 13 | Complete |
 | MCP-10 | Phase 13 | Complete |
 | MCP-11 | Phase 15 | Pending |
 

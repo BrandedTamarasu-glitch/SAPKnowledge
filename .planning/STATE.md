@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** v1.1 milestone — MCP Server. Phase 13 Plan 01 complete (kb_reader.py). Next: Phase 13 Plan 02 (mcp_server.py).
+**Current focus:** v1.1 milestone — MCP Server. Phase 13 complete (kb_reader.py + mcp_server.py + .mcp.json). Next: Phase 14 (MCP-08 search_by_keyword).
 
 ## Current Position
 
 Phase: 13
-Plan: 13-02 (next)
-Status: Phase 13 Plan 01 complete — kb_reader.py extraction helpers created; fastmcp==3.0.2 pinned; .gitignore created.
-Last activity: 2026-02-23 — Phase 13 Plan 01 executed (kb_reader.py + requirements.txt + .gitignore)
+Plan: 13-02 (complete)
+Status: Phase 13 complete — all P1 tools delivered; mcp_server.py with five tools + .mcp.json registered; .venv/ provisioned with fastmcp==3.0.2.
+Last activity: 2026-02-23 — Phase 13 Plan 02 executed (mcp_server.py + .mcp.json)
 
-Progress: [██████████] 97%
+Progress: [██████████] 98%
 
-(38 known plans have SUMMARY.md; Phase 13 Plans 02+ and Phases 14/15 pending)
+(39 known plans have SUMMARY.md; Phases 14/15 pending)
 
 ## Performance Metrics
 
@@ -144,10 +144,13 @@ Recent decisions affecting current work:
 - [Phase 13-01]: fastmcp==3.0.2 pinned at exact version (not >=) — floor-only spec insufficient for production
 - [Phase 13-01]: normalize_module returns None (not raises) for out-of-KB modules — enables clean user-facing error messages in mcp_server.py
 - [Phase 13-01]: MIGO first-match strategy — first occurrence in MM tcodes.md is Goods Receipt, correct for most common query
+- [Phase 13-02]: No print() calls in mcp_server.py — stdout is MCP protocol wire; print() absence verified via AST (not raw text) to avoid comment false positives
+- [Phase 13-02]: compare_ecc_s4 reads DISAMBIGUATION_FILE directly via parse_frontmatter (not get_file_body) — disambiguation file is not in modules/{module}/ path template
+- [Phase 13-02]: _tool_manager internal API not present in FastMCP 3.0.2 — tool verification uses import + functional smoke tests instead
 
 ### Pending Todos
 
-- Execute Phase 13 Plan 02 (mcp_server.py with all 5 P1 tools)
+- Execute Phase 14 Plan 01 (MCP-08 search_by_keyword tool)
 
 ### Blockers/Concerns
 
@@ -156,5 +159,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 13-mcp-server-scaffold-p1-tools/13-01-PLAN.md (kb_reader.py, requirements.txt, .gitignore)
+Stopped at: Completed 13-mcp-server-scaffold-p1-tools/13-02-PLAN.md (mcp_server.py + .mcp.json + .venv/)
 Resume file: None
