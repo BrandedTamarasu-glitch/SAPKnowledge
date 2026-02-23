@@ -271,7 +271,10 @@ Plans:
   2. Setup guide covers Claude Desktop config file location and JSON snippet for all three platforms (macOS, Windows, Linux)
   3. Setup guide includes a verification step the user can run to confirm the server is discoverable before opening Claude
   4. A reader with no Python background can complete local setup in under 15 minutes following only the guide
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 15-01-PLAN.md — SETUP.md (full non-developer setup guide) + README.md link
 
 ## Progress
 
@@ -294,4 +297,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 12. Solution Design Intelligence | 2/3 | In Progress|  |
 | 13. MCP Server Scaffold + P1 Tools | 2/2 | Complete    | 2026-02-23 |
 | 14. Keyword Search Tool | 1/1 | Complete    | 2026-02-23 |
-| 15. Deployment Documentation | 0/TBD | Not started | - |
+| 15. Deployment Documentation | 0/1 | Not started | - |
