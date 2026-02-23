@@ -10,7 +10,7 @@ Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
 
 ### MCP Server Infrastructure
 
-- [ ] **MCP-01**: Developer can install the MCP server using standard Python tooling (venv + pip install)
+- [x] **MCP-01**: Developer can install the MCP server using standard Python tooling (venv + pip install)
 - [ ] **MCP-02**: MCP server runs via stdio transport registered at repo root (`.mcp.json`) for Claude Code + Claude Desktop
 
 ### MCP Query Tools
@@ -25,7 +25,7 @@ Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
 ### Tool Design Quality
 
 - [ ] **MCP-09**: Each tool description is written as an invocation condition for reliable LLM routing (not a developer description)
-- [ ] **MCP-10**: Tool responses use section-level extraction (not full file content) to stay within context limits
+- [x] **MCP-10**: Tool responses use section-level extraction (not full file content) to stay within context limits
 
 ### Deployment
 
@@ -143,7 +143,7 @@ Requirements for initial release (v1.0 — all shipped).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MCP-01 | Phase 13 | Pending |
+| MCP-01 | Phase 13 | Complete |
 | MCP-02 | Phase 13 | Pending |
 | MCP-03 | Phase 13 | Pending |
 | MCP-04 | Phase 13 | Pending |
@@ -152,7 +152,7 @@ Requirements for initial release (v1.0 — all shipped).
 | MCP-07 | Phase 13 | Pending |
 | MCP-08 | Phase 14 | Pending |
 | MCP-09 | Phase 13 | Pending |
-| MCP-10 | Phase 13 | Pending |
+| MCP-10 | Phase 13 | Complete |
 | MCP-11 | Phase 15 | Pending |
 
 **Coverage:**

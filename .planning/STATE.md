@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** v1.1 milestone — MCP Server. Roadmap created. Phase 12 Plan 03 still pending (checklists.md). Phase 13 is next after Phase 12 completes.
+**Current focus:** v1.1 milestone — MCP Server. Phase 13 Plan 01 complete (kb_reader.py). Next: Phase 13 Plan 02 (mcp_server.py).
 
 ## Current Position
 
-Phase: 12 (completing) / 13 (next)
-Plan: 12-03 pending, then Phase 13 planning
-Status: v1.1 roadmap defined — Phases 13/14/15 added. Phase 12 has one remaining plan.
-Last activity: 2026-02-23 — v1.1 milestone roadmap created (Phases 13, 14, 15)
+Phase: 13
+Plan: 13-02 (next)
+Status: Phase 13 Plan 01 complete — kb_reader.py extraction helpers created; fastmcp==3.0.2 pinned; .gitignore created.
+Last activity: 2026-02-23 — Phase 13 Plan 01 executed (kb_reader.py + requirements.txt + .gitignore)
 
 Progress: [██████████] 97%
 
-(37 known plans have SUMMARY.md; 3 v1.1 phases pending)
+(38 known plans have SUMMARY.md; Phase 13 Plans 02+ and Phases 14/15 pending)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [██████████] 97%
 *Updated after each plan completion*
 | Phase 12-solution-design-intelligence P01 | 5 | 1 tasks | 1 files |
 | Phase 12 P02 | 15 | 2 tasks | 2 files |
+| Phase 13-mcp-server P01 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -140,19 +141,20 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: MCP-11 (deployment docs) is Phase 15 — final deliverable, depends on server being complete and validated
 - [v1.1 Roadmap]: MCP server is read-only — never moves, renames, or transforms KB files; native CLAUDE.md loading path unchanged
 - [v1.1 Roadmap]: Tool descriptions must be written as LLM invocation conditions (MCP-09); section-level extraction enforced, no full file dumps (MCP-10)
+- [Phase 13-01]: fastmcp==3.0.2 pinned at exact version (not >=) — floor-only spec insufficient for production
+- [Phase 13-01]: normalize_module returns None (not raises) for out-of-KB modules — enables clean user-facing error messages in mcp_server.py
+- [Phase 13-01]: MIGO first-match strategy — first occurrence in MM tcodes.md is Goods Receipt, correct for most common query
 
 ### Pending Todos
 
-- Complete Phase 12 Plan 03 (checklists.md) before starting Phase 13
+- Execute Phase 13 Plan 02 (mcp_server.py with all 5 P1 tools)
 
 ### Blockers/Concerns
 
 - Subagent directory permission issue: agents spawned from ~/Claude/General cannot write to ~/Claude/SAPKnowledge. Workaround: execute plans directly from orchestrator level.
-- v1.1 gap noted in SUMMARY.md: pin exact mcp package version before writing requirements.txt (floor-only spec is insufficient for production)
-- v1.1 gap: venv strategy must be decided before Phase 13 Plan 1 (affects .mcp.json absolute path and setup docs)
 
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: v1.1 roadmap created — Phases 13, 14, 15 added to ROADMAP.md. Phase 12 Plan 03 still pending.
+Stopped at: Completed 13-mcp-server-scaffold-p1-tools/13-01-PLAN.md (kb_reader.py, requirements.txt, .gitignore)
 Resume file: None
