@@ -1,394 +1,411 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** SAP ECC 6.0 Curated Knowledge Base for Claude Code
-**Researched:** 2026-02-16
+**Domain:** MCP Server over a flat-file markdown knowledge base (SAP ECC 6.0)
+**Researched:** 2026-02-23
+**Confidence:** HIGH
 
-## Recommended Architecture
+> This file supersedes the v1.0 ARCHITECTURE.md (flat-file KB architecture). v1.1 adds an MCP server layer on top of the existing KB. The flat-file KB structure documented in v1.0 is unchanged and remains the source of truth.
 
-A flat-file markdown knowledge base organized into module directories, loaded into Claude Code via the `.claude/rules/` auto-loading mechanism and `@import` references. The architecture exploits Claude Code's hierarchical memory system to deliver module-specific SAP knowledge on demand without overwhelming the context window.
+---
 
-### Design Principle: Selective Loading Over Monolith
+## Standard Architecture
 
-Claude Code's context window is finite. Loading all SAP knowledge for all modules at once is wasteful when a user asks about one procurement process. The architecture splits content so that:
+### System Overview
 
-1. **Always-loaded content** (CLAUDE.md + rules/) provides the index, cross-reference map, and lookup instructions
-2. **On-demand content** (module directories) gets pulled in when Claude reads files in those subtrees
-3. **Deep-reference content** (@import from within files) chains detail when needed
+```
++---------------------------------------------------------------------+
+|                         MCP Client Layer                             |
+|   +------------------+          +------------------------------+    |
+|   |   Claude Code    |          |   Claude Desktop             |    |
+|   |  (.mcp.json or   |          |  (claude_desktop_config.json)|    |
+|   |   mcpServers)    |          |                              |    |
+|   +--------+---------+          +--------------+---------------+    |
++------------|-----------------------------------------|---------------+
+             |  stdio (JSON-RPC 2.0)                   |  stdio (JSON-RPC 2.0)
+             v                                         v
++---------------------------------------------------------------------+
+|                       MCP Server Process                             |
+|                    scripts/mcp_server.py                             |
+|                                                                      |
+|   +--------------------------------------------------------------+  |
+|   |  FastMCP instance -- tool registry, request dispatch         |  |
+|   +--------------------------------------------------------------+  |
+|                                                                      |
+|   +--------------+  +--------------+  +--------------+             |
+|   |  search_kb   |  |  get_content |  | lookup_tcode |             |
+|   |  @mcp.tool() |  |  @mcp.tool() |  |  @mcp.tool() |             |
+|   +------+-------+  +------+-------+  +------+-------+             |
+|          |                 |                  |                      |
+|   +------+-----------------+------------------+---------------+     |
+|   |         kb_reader.py -- KB I/O utilities                  |     |
+|   |  parse_frontmatter()  |  read_file()  |  list_kb_files()  |     |
+|   +------------------------------------------------------------+     |
++-----------------------------+---------------------------------------+
+                              |  os.path / open() -- on-demand file I/O
+                              v
++---------------------------------------------------------------------+
+|                       KB File System (disk)                          |
+|                                                                      |
+|  modules/mm/       modules/sd/       modules/fi/       modules/co/  |
+|  +- tcodes.md      +- tcodes.md      +- tcodes.md      +- tcodes.md |
+|  +- processes.md   +- processes.md   +- processes.md   +- processes  |
+|  +- integration.md +- integration.md +- integration.md +- integrat. |
+|  +- mm-advanced.md +- sd-advanced.md +- fi-advanced.md +- co-adv.md |
+|  +- ...            +- ...            +- ...            +- ...       |
+|                                                                      |
+|  cross-module/                   reference/                         |
+|  +- record-to-report.md          +- movement-types.md               |
+|  +- mm-sd-integration.md         +- document-types.md               |
+|  +- checklists.md                +- ...                             |
+|  +- playbooks.md                                                     |
+|  +- design-patterns.md                                               |
++---------------------------------------------------------------------+
+```
 
-### File/Folder Hierarchy
+### Component Responsibilities
+
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| `scripts/mcp_server.py` | MCP server entry point; registers tools; runs stdio transport loop | Python, `FastMCP` class, `@mcp.tool()` decorators, `mcp.run(transport="stdio")` |
+| `scripts/kb_reader.py` | KB I/O layer; parses YAML frontmatter; enumerates KB files; reads bodies | Python, PyYAML (already a dependency); logic extracted from `validate.py` |
+| `search_kb` tool | Full-text keyword search across all KB files; returns ranked excerpts | Iterates all KB files, searches body text, returns (file, module, content_type, excerpt, confidence) per match |
+| `get_content` tool | Retrieves the full body of one file by module + content_type | Single targeted file read via frontmatter-index lookup |
+| `lookup_tcode` tool | Finds the definition and context of a specific SAP transaction code | Searches tcodes.md and advanced files for the T-code string with 3-line context window |
+| `list_modules` tool | Returns the inventory of all KB files with module, content_type, and confidence | Reads frontmatter from all KB files without loading their bodies |
+| KB files (disk) | Source of truth for all SAP ECC 6.0 knowledge | Flat markdown with YAML frontmatter; read-only at runtime; never modified by the server |
+
+---
+
+## Recommended Project Structure
 
 ```
 SAPKnowledge/
-├── CLAUDE.md                          # Root: project purpose, how to use this KB, module index
-├── .claude/
-│   ├── CLAUDE.md                      # Claude Code instructions: "when asked about SAP, read from modules/"
-│   └── rules/
-│       ├── sap-general.md             # Always loaded: ECC 6 vs S/4 disambiguation rules
-│       ├── org-structure.md           # Always loaded: org unit hierarchy reference
-│       └── integration-map.md         # Always loaded: cross-module integration point index
-│
-├── modules/
-│   ├── CLAUDE.md                      # Module-level: index of all modules, when to use each
-│   │
-│   ├── mm/                            # Materials Management
-│   │   ├── CLAUDE.md                  # MM overview, sub-file index, key concepts
-│   │   ├── tcodes.md                  # T-code reference (ME21N, ME51N, MIGO, etc.)
-│   │   ├── config-spro.md            # SPRO/IMG paths for MM configuration
-│   │   ├── processes.md              # Procure-to-pay process flow with T-code mapping
-│   │   ├── master-data.md            # Material master, vendor master, info records
-│   │   ├── integration.md            # MM integration points (MM->FI, MM->SD, MM->CO)
-│   │   └── patterns.md              # Solution design patterns for common MM scenarios
-│   │
-│   ├── sd/                            # Sales and Distribution
-│   │   ├── CLAUDE.md                  # SD overview, sub-file index
-│   │   ├── tcodes.md
-│   │   ├── config-spro.md
-│   │   ├── processes.md              # Order-to-cash process flow
-│   │   ├── master-data.md            # Customer master, material determination, pricing
-│   │   ├── integration.md            # SD->FI billing, SD->MM availability
-│   │   └── patterns.md
-│   │
-│   ├── fi/                            # Financial Accounting
-│   │   ├── CLAUDE.md
-│   │   ├── tcodes.md
-│   │   ├── config-spro.md
-│   │   ├── processes.md              # Record-to-report, period close
-│   │   ├── master-data.md            # Chart of accounts, G/L accounts, vendor/customer
-│   │   ├── integration.md            # FI<->CO reconciliation, FI<->MM automatic postings
-│   │   └── patterns.md
-│   │
-│   └── co/                            # Controlling
-│       ├── CLAUDE.md
-│       ├── tcodes.md
-│       ├── config-spro.md
-│       ├── processes.md              # Cost center accounting, internal orders, profitability
-│       ├── master-data.md            # Cost centers, cost elements, profit centers
-│       ├── integration.md            # CO->FI reconciliation, CO->MM cost assignment
-│       └── patterns.md
-│
-├── cross-module/                      # Content that spans multiple modules
-│   ├── CLAUDE.md                      # Index of cross-module topics
-│   ├── procure-to-pay.md            # End-to-end P2P: MM + FI + CO touchpoints
-│   ├── order-to-cash.md             # End-to-end O2C: SD + FI + CO touchpoints
-│   ├── record-to-report.md          # End-to-end R2R: FI + CO
-│   ├── automatic-postings.md        # OBYC/account determination across modules
-│   └── org-structure-design.md      # How org units relate across all modules
-│
-└── reference/                         # Lookup tables and quick-reference
-    ├── CLAUDE.md
-    ├── movement-types.md             # Goods movement types (101, 201, 301, etc.)
-    ├── document-types.md             # FI document types, MM document types
-    ├── posting-keys.md               # Debit/credit posting keys
-    └── ecc6-vs-s4.md                # Comprehensive ECC 6 vs S/4HANA differences
++-- scripts/
+|   +-- mcp_server.py        # MCP server entry point -- FastMCP, tool definitions
+|   +-- kb_reader.py         # KB I/O utilities -- parse_frontmatter, read_file, list_kb_files
+|   +-- validate.py          # Existing validation script (unchanged; share parse_frontmatter with kb_reader)
+|   +-- requirements.txt     # Add mcp>=1.2.0 alongside existing PyYAML>=6.0
++-- modules/
+|   +-- mm/                  # MM module KB files (unchanged)
+|   +-- sd/                  # SD module KB files (unchanged)
+|   +-- fi/                  # FI module KB files (unchanged)
+|   +-- co/                  # CO module KB files (unchanged)
++-- cross-module/            # Cross-module KB files (unchanged)
++-- reference/               # Reference lookup tables (unchanged)
++-- .mcp.json                # Claude Code MCP registration (new file, committed to repo)
++-- .planning/               # Planning and research (unchanged)
 ```
 
-### Component Boundaries
+### Structure Rationale
 
-| Component | Responsibility | Always Loaded? | Communicates With |
-|-----------|---------------|----------------|-------------------|
-| `.claude/rules/sap-general.md` | ECC 6 identity, version disambiguation | Yes (auto-loaded) | All module files |
-| `.claude/rules/org-structure.md` | Org unit hierarchy quick-reference | Yes (auto-loaded) | All module config files |
-| `.claude/rules/integration-map.md` | Master index of all cross-module integration points | Yes (auto-loaded) | All module integration.md files |
-| `modules/{module}/CLAUDE.md` | Module overview and file index | On-demand (when subtree entered) | All files within that module |
-| `modules/{module}/tcodes.md` | Transaction code reference for one module | On-demand | processes.md, config-spro.md |
-| `modules/{module}/config-spro.md` | SPRO/IMG configuration paths | On-demand | org-structure.md, master-data.md |
-| `modules/{module}/processes.md` | Business process flows with T-code mapping | On-demand | tcodes.md, integration.md |
-| `modules/{module}/integration.md` | How this module connects to others | On-demand | Other modules' integration.md, cross-module/ |
-| `modules/{module}/patterns.md` | Solution design patterns | On-demand | All files in module |
-| `cross-module/` | End-to-end process documentation spanning modules | On-demand | All module files |
-| `reference/` | Lookup tables (movement types, doc types, posting keys) | On-demand | All module files |
+- **`scripts/mcp_server.py` in `scripts/`:** Keeps the server alongside the existing `validate.py`. No new top-level directories needed. Consistent with the existing scripts-for-tooling convention.
+- **`scripts/kb_reader.py` as a separate module:** Isolates KB I/O from the MCP protocol layer. `validate.py` already parses frontmatter with PyYAML. `kb_reader.py` extracts and extends that logic so it is importable by the server without duplicating code or modifying the validator.
+- **`.mcp.json` at repo root:** Claude Code looks for `.mcp.json` in the project root at session start. Committing it to the repo means every Claude Code session on this machine auto-discovers the server without any manual config step.
+- **KB files untouched:** The server is read-only. No KB file is modified, renamed, or relocated at runtime.
 
-### Data Flow: How Content Gets Loaded Into Claude
+---
 
-```
-User asks: "How do I configure automatic account determination for goods receipt in MM?"
+## Architectural Patterns
 
-1. ALWAYS IN CONTEXT (loaded at session start):
-   .claude/rules/sap-general.md    --> "This is ECC 6, not S/4HANA"
-   .claude/rules/integration-map.md --> "MM->FI auto postings: see OBYC, modules/mm/integration.md"
-   .claude/rules/org-structure.md   --> "Valuation area = plant level in ECC 6"
+### Pattern 1: On-Demand File Reads (No Indexing)
 
-2. CLAUDE READS (on-demand, Claude navigates to relevant files):
-   modules/mm/CLAUDE.md            --> MM overview, directs to config-spro.md and integration.md
-   modules/mm/config-spro.md       --> SPRO path: MM > Valuation > Account Determination
-   modules/mm/integration.md       --> OBYC details, valuation class -> G/L mapping
-   cross-module/automatic-postings.md --> Full account determination walkthrough
+**What:** The server reads files from disk on every tool call. There is no in-memory index, SQLite database, or pre-built search structure. Each `search_kb` call opens and reads all ~35 KB files; each `get_content` call opens one file.
 
-3. REFERENCE LOOKUP (if needed):
-   reference/movement-types.md     --> Movement type 101 = GR to warehouse
-```
+**When to use:** KB has ~35 files, each under 5,000 tokens, total on-disk size under 300KB. On-demand reads at this scale complete in under 100ms. No startup latency, no index maintenance, no stale data.
 
-**Key insight:** Claude Code loads CLAUDE.md files in child directories when it reads files in those subtrees. This means placing a CLAUDE.md in each module directory acts as a local index -- Claude gets the module overview automatically when it opens any file in that module.
+**Trade-offs:**
+- Pro: Zero state management. Server restarts instantly. No cache invalidation when KB files are edited.
+- Pro: Any KB file edit is reflected immediately in the next tool call.
+- Con: Does not scale beyond ~500 files before search latency becomes noticeable. At that point, build a simple in-memory index at server startup.
 
-### How @import References Work Across Modules
+**Example:**
+```python
+import os
 
-Within any file, use `@path/to/file` to reference related content. Claude Code resolves these relative to the containing file, up to 5 levels deep.
+KB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONTENT_DIRS = ["modules", "cross-module", "reference"]
 
-**Example in `modules/mm/integration.md`:**
-```markdown
-## MM -> FI Automatic Account Determination
-
-The key transaction is OBYC. For the full account determination logic across all modules,
-see @../../cross-module/automatic-postings.md
-
-Valuation class configuration is in @config-spro.md under "Valuation and Account Assignment."
-
-For the org structure context (valuation area = plant in ECC 6), see
-@../../.claude/rules/org-structure.md
+def list_kb_files() -> list[str]:
+    """Return absolute paths of all .md files under content directories."""
+    paths = []
+    for d in CONTENT_DIRS:
+        base = os.path.join(KB_ROOT, d)
+        for root, _, files in os.walk(base):
+            for f in files:
+                if f.endswith(".md"):
+                    paths.append(os.path.join(root, f))
+    return paths
 ```
 
-**Cross-reference strategy:**
-- Module-internal references: relative paths (`@tcodes.md`, `@config-spro.md`)
-- Cross-module references: relative paths up (`@../../cross-module/procure-to-pay.md`)
-- Always-available references: absolute from project root or relative up to `.claude/rules/`
+---
 
-### Content File Internal Structure (Standard Template)
+### Pattern 2: Frontmatter-Filtered Retrieval
 
-Every content file follows a consistent structure so Claude can parse predictably:
+**What:** Every KB file has a YAML frontmatter block with `module`, `content_type`, `confidence`, and `last_verified` fields. The server parses this block without reading the entire file body to support `list_modules` and to route `get_content` requests.
 
-```markdown
-# [Module] - [Topic]
+**When to use:** Any time the tool input includes a `module` or `content_type` parameter. Filtering by frontmatter lets the server answer "give me the MM processes file" without full-text searching the body.
 
-> ECC 6.0 specific. For S/4HANA differences, see @../../reference/ecc6-vs-s4.md
+**Trade-offs:**
+- Pro: Low-cost targeted retrieval. Parse frontmatter of all 35 files, skip body reads for non-matching files.
+- Pro: `confidence: low` files can be flagged in tool responses, alerting the model to verify content.
+- Con: Requires consistent frontmatter across all KB files. The existing `validate.py` enforces this via CI.
 
-## Quick Reference
-[Table or bullet list for fast lookups]
+**Example:**
+```python
+import yaml
 
-## Detail
-[Expanded explanations, SPRO paths, process steps]
+def parse_frontmatter(filepath: str) -> tuple[dict, str]:
+    """Return (metadata_dict, body_str) from a KB markdown file with YAML frontmatter."""
+    with open(filepath, encoding="utf-8") as f:
+        content = f.read()
+    if not content.startswith("---"):
+        return {}, content
+    end = content.find("---", 3)
+    if end == -1:
+        return {}, content
+    meta = yaml.safe_load(content[3:end])
+    body = content[end + 3:].lstrip("\n")
+    return meta or {}, body
+```
+
+This is the same logic already in `validate.py`. `kb_reader.py` is the authoritative home; `validate.py` should import it.
+
+---
+
+### Pattern 3: Tools as the Primary MCP Primitive
+
+**What:** The server exposes all KB access as MCP Tools (`@mcp.tool()`). Tools are model-invocable — Claude decides when to call them. This contrasts with MCP Resources (app-controlled, passive) or Prompts (user-invoked templates).
+
+**When to use:** The primary consumer is Claude (the model). The model needs to decide whether to query the KB, which query to issue, and how to use the result. Tools enable that autonomy.
+
+**Trade-offs:**
+- Pro: Claude can chain tool calls. `list_modules` to find the right file, then `get_content` to read it.
+- Pro: Tool input/output is typed JSON, making responses predictable and parseable.
+- Con: Every KB access incurs a round-trip tool call. Acceptable for a local stdio server where round-trips are sub-millisecond.
+
+**Example:**
+```python
+from mcp.server.fastmcp import FastMCP
+from kb_reader import parse_frontmatter, list_kb_files
+
+mcp = FastMCP("SAP ECC 6.0 Knowledge Base")
+
+@mcp.tool()
+def get_content(module: str, content_type: str) -> str:
+    """Return the full body of a KB file by module and content_type.
+
+    Args:
+        module: One of mm, sd, fi, co, cross-module, reference
+        content_type: e.g. processes, tcodes, integration, config-spro
+    """
+    for path in list_kb_files():
+        meta, body = parse_frontmatter(path)
+        if meta.get("module") == module and meta.get("content_type") == content_type:
+            confidence = meta.get("confidence", "unknown")
+            return f"[Confidence: {confidence}]\n\n{body}"
+    return f"No KB file found for module={module}, content_type={content_type}"
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+```
+
+---
+
+## Data Flow
+
+### Request Flow: search_kb
+
+```
+Claude decides to query KB for "how does GR/IR clearing work"
+    |
+    | tools/call {"name": "search_kb", "arguments": {"query": "GR/IR clearing"}}
+    | (JSON-RPC 2.0 over stdin pipe)
+    v
+mcp_server.py -- FastMCP dispatches to search_kb handler
+    |
+    v
+kb_reader.list_kb_files() --> [~35 absolute paths]
+    |
+    v
+For each path:
+    kb_reader.parse_frontmatter(path) --> (meta, body)
+    body.lower().find(query.lower()) --> match? extract 3-line excerpt
+    |
+    v
+Ranked list of (file_path, module, content_type, excerpt, confidence)
+    |
+    v
+Serialize to JSON string --> write to stdout (JSON-RPC 2.0 response)
+    |
+Claude receives tool result, calls get_content for the best match
+```
+
+### Request Flow: get_content
+
+```
+Claude calls get_content(module="mm", content_type="integration")
+    |
+    v
+kb_reader.list_kb_files() --> iterate until frontmatter matches
+    |
+    v
+parse_frontmatter(matching_path) --> (meta, body)
+Prepend "[Confidence: high]" header
+Return full body (~2,000-8,000 tokens)
+    |
+    v
+stdout --> Claude reads full file content and answers the user
+```
+
+### Request Flow: lookup_tcode
+
+```
+Claude calls lookup_tcode(tcode="MMPV")
+    |
+    v
+kb_reader.list_kb_files()
+--> filter to files where content_type in ("tcodes", "processes", "integration", "checklists")
+    |
+    v
+For each candidate file:
+    search body text for "\bMMPV\b" with 3-line context window
+    |
+    v
+Return all matches: [{source_file, module, context_lines}]
+    Multiple files may reference the same T-code (e.g., MMPV appears in
+    mm/integration.md AND cross-module/checklists.md)
+```
+
+### Key Data Flows
+
+1. **Frontmatter-first filtering:** For `get_content` and `list_modules`, frontmatter is parsed across all files but body text is read only for matching files. This minimizes I/O for targeted retrieval.
+2. **Full-scan for search:** `search_kb` reads all file bodies. Acceptable at ~35 files (~200ms worst case). If KB grows to hundreds of files, pre-compute an in-memory index at startup.
+3. **Confidence surfacing:** Every response includes the `confidence` field from frontmatter. This lets Claude tell the user when content is `low` confidence and needs external verification.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| Current (~35 files, 1 local user) | On-demand reads. No indexing. No caching. Single Python process over stdio. |
+| Medium (~200 files, 1 local user) | Add in-memory index built at server startup: dict mapping (module, content_type) to path; simple inverted index of lowercase tokens to [paths]. Startup cost ~50ms. |
+| Large (~500+ files, multiple concurrent users) | Switch from stdio to HTTP/SSE transport. Add sqlite FTS5 search index. Use async I/O. Consider separate search worker. |
+
+### Scaling Priorities
+
+1. **First bottleneck:** `search_kb` latency grows linearly with file count. Fix: build an inverted token index at startup, invalidate entries when files are modified (use file mtime comparison on each request or inotify).
+2. **Second bottleneck:** Multiple concurrent users. The stdio transport is inherently single-client. Fix: switch to HTTP/SSE transport and a basic process pool or async handler.
+
+For v1.1 (single local user, ~35 files), neither bottleneck applies. Do not pre-optimize.
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Writing to stdout in the server process
+
+**What people do:** Use `print()` for debug messages or status output while running the stdio MCP transport.
+
+**Why it's wrong:** The MCP stdio transport uses stdout as the exclusive JSON-RPC communication channel. Any non-JSON content written to stdout corrupts the protocol stream, causing the client to fail with a silent parse error that is difficult to diagnose.
+
+**Do this instead:** Use `sys.stderr` for all logging. In development, redirect stderr to a file: `python3 mcp_server.py 2>>server.log`. The MCP SDK also provides a structured `send_log_message` facility for surfacing logs through the protocol itself.
+
+---
+
+### Anti-Pattern 2: Module-level side effects (indexing at import time)
+
+**What people do:** Build a search index or read KB files at module import time: `INDEX = build_index()` at the top of `mcp_server.py`.
+
+**Why it's wrong:** MCP clients may import the server module to introspect its tools without starting the full server runtime. Module-level I/O causes errors when `KB_ROOT` is unset, the working directory is wrong, or files are missing. It also prevents unit testing without a full KB on disk.
+
+**Do this instead:** Initialize lazily inside tool handlers or in an explicit startup hook. Keep module-level code to constant definitions and function declarations.
+
+---
+
+### Anti-Pattern 3: Exposing `.claude/rules/` files as MCP content
+
+**What people do:** Walk the entire repo directory tree and expose every `.md` file as a retrievable document.
+
+**Why it's wrong:** The `.claude/rules/` files (sap-routing.md, sap-disambiguation.md, etc.) are Claude Code session context files that define how the current session behaves. They are not SAP knowledge content. Exposing them through MCP would confuse the model about the boundary between configuration and content, and risks the model applying routing rules as factual SAP content.
+
+**Do this instead:** Scope KB file discovery explicitly to `modules/`, `cross-module/`, and `reference/`. Use an explicit whitelist in `list_kb_files()`. Never walk `.claude/`, `.planning/`, or `scripts/`.
+
+---
+
+### Anti-Pattern 4: Returning full file bodies from search_kb
+
+**What people do:** For every file that contains the search query, return the entire file body in the `search_kb` result.
+
+**Why it's wrong:** KB files are 2,000-8,000 tokens each. Returning 10 full files from a search call consumes 20,000-80,000 tokens in a single tool response. This saturates the context window and forces Claude to process far more text than needed to decide which file to retrieve next.
+
+**Do this instead:** `search_kb` returns summaries: file path, module, content_type, confidence, and a 3-5 line excerpt around each match. Claude then calls `get_content` for the one or two specific files it needs. This is the standard search-then-retrieve pattern used by Context7 and similar KB tools.
+
+---
 
 ## Integration Points
-[How this topic connects to other modules -- with @import links]
 
-## Common Scenarios
-[FAQ-style: "When you need to X, do Y"]
+### Deployment Configuration
+
+| Client | Config File | Example Entry | Notes |
+|--------|-------------|---------------|-------|
+| Claude Code | `.mcp.json` at repo root | `{"sap-kb": {"command": "python3", "args": ["/abs/path/scripts/mcp_server.py"]}}` | Committed to repo; auto-discovered at session start |
+| Claude Desktop | `~/.config/Claude/claude_desktop_config.json` | `{"mcpServers": {"sap-kb": {"command": "python3", "args": ["/abs/path/scripts/mcp_server.py"]}}}` | Not committed; user-configured per machine |
+
+Both clients launch the server as a child process over stdio. No port, no network, no daemon process to manage.
+
+**Observed `.mcp.json` format from context7 on this machine:**
+```json
+{
+  "context7": {
+    "command": "npx",
+    "args": ["-y", "@upstash/context7-mcp"]
+  }
+}
 ```
+The SAP KB server uses `python3` + absolute path instead of `npx`, but the format is identical.
 
-## Patterns to Follow
+### New vs. Existing Files
 
-### Pattern 1: Module-Local CLAUDE.md as Router
+| File | Status | Notes |
+|------|--------|-------|
+| `scripts/mcp_server.py` | New | MCP server entry point; tool definitions; `mcp.run(transport="stdio")` |
+| `scripts/kb_reader.py` | New | KB I/O utilities; `parse_frontmatter`, `read_file`, `list_kb_files` |
+| `scripts/requirements.txt` | Modified | Add `mcp>=1.2.0` (or `mcp[cli]`) to existing `PyYAML>=6.0` |
+| `.mcp.json` | New | Claude Code MCP registration at repo root |
+| `scripts/validate.py` | Unchanged | Existing validator; refactor to import `parse_frontmatter` from `kb_reader.py` |
+| All KB `.md` files | Unchanged | Read-only at runtime; server never modifies KB content |
 
-**What:** Each module directory gets a CLAUDE.md that acts as a table of contents and routing guide.
-**When:** Always -- this is the primary navigation mechanism.
-**Why:** Claude Code auto-loads CLAUDE.md when entering a subtree, giving Claude immediate orientation.
+### Reuse from validate.py
 
-```markdown
-# SAP MM - Materials Management
+`validate.py` already implements the exact frontmatter parsing logic the server needs:
+- `parse_frontmatter(filepath)` — splits `---` YAML block from body, returns both
+- `VALID_MODULES` set: `{"fi", "mm", "sd", "co", "cross-module", "reference"}`
+- `VALID_CONTENT_TYPES` set (12 valid values including processes, tcodes, integration, config-spro, etc.)
+- `VALID_CONFIDENCE` set: `{"high", "medium", "low"}`
 
-## When to Use This Module
-- Procurement of goods and services
-- Inventory management and goods movements
-- Invoice verification
+Recommended refactor: move this logic into `kb_reader.py`, then have both `validate.py` and `mcp_server.py` import from `kb_reader.py`. This avoids duplicate code without breaking the existing validation CI.
 
-## File Index
-| File | Contains | Use When |
-|------|----------|----------|
-| @tcodes.md | Transaction codes | Looking up a T-code or finding the right transaction |
-| @config-spro.md | SPRO/IMG paths | Configuring MM settings |
-| @processes.md | Process flows | Understanding procure-to-pay or inventory processes |
-| @master-data.md | Master data objects | Working with material masters, vendor masters |
-| @integration.md | Cross-module links | Understanding MM postings to FI, CO |
-| @patterns.md | Design patterns | Solving common business requirements |
+### Python Environment
 
-## Key Concepts
-- Valuation area = Plant (ECC 6 default)
-- Purchasing organization can be cross-company-code
-- Movement types drive automatic account determination
-```
+- Python 3.14.2 at `/usr/bin/python3` (confirmed by `python3 --version`)
+- `PyYAML>=6.0` already installed (in `scripts/requirements.txt`)
+- `mcp` package not yet installed — must be added before v1.1 development begins
+- No virtual environment exists currently — create one at `scripts/venv/` or install with `pip install --user mcp`
 
-### Pattern 2: T-Code Tables with Context
-
-**What:** T-code files use structured tables with description, menu path, usage context, and related T-codes.
-**When:** Every module's tcodes.md.
-**Why:** Bare T-code lists are useless. Context makes them actionable.
-
-```markdown
-## Procurement T-Codes
-
-| T-Code | Description | Menu Path | When to Use | Related |
-|--------|-------------|-----------|-------------|---------|
-| ME21N | Create Purchase Order | Logistics > MM > Purchasing > PO > Create | Standard PO creation | ME22N (change), ME23N (display) |
-| ME51N | Create Purchase Requisition | Logistics > MM > Purchasing > PR > Create | Internal procurement request | ME52N, ME53N |
-| MIGO | Goods Movement | Logistics > MM > Inventory Mgmt > Goods Movement | GR, GI, transfers | MB51 (doc list) |
-```
-
-### Pattern 3: SPRO Paths as Navigable Trees
-
-**What:** Configuration content uses indented tree notation matching the actual SPRO/IMG path.
-**When:** Every module's config-spro.md.
-**Why:** Users need the exact click path, not just the node name.
-
-```markdown
-## Account Determination for Goods Movement
-
-**SPRO Path:**
-> IMG > Materials Management > Valuation and Account Assignment
->   > Account Determination
->     > Account Determination Without Wizard
->       > Configure Automatic Postings (OBYC)
-
-**What it controls:** Maps movement type + valuation class to G/L accounts
-**Key settings:**
-- Transaction key BSX = inventory posting
-- Transaction key WRX = GR/IR clearing
-- Valuation class from material master (Accounting view)
-
-**Prerequisites:** Chart of accounts assigned to company code, valuation area = plant
-**Integration:** Posts to FI automatically. See @integration.md
-```
-
-### Pattern 4: Integration Points as Bidirectional Maps
-
-**What:** Integration files document both directions of every cross-module touchpoint.
-**When:** Every module's integration.md and the master integration-map.md in rules/.
-**Why:** "MM posts to FI" is incomplete without knowing what triggers it, what determines the account, and how to troubleshoot.
-
-```markdown
-## MM -> FI: Goods Receipt Posting
-
-**Trigger:** MIGO goods receipt (movement type 101)
-**What posts:** Inventory account (debit) + GR/IR clearing (credit)
-**Account determination:** OBYC transaction keys BSX + WRX
-**Determined by:** Valuation class (material master) + chart of accounts
-**FI document type:** WE (goods receipt)
-**Troubleshooting:** If posting fails, check OBYC config for the valuation class + chart of accounts combination
-
-**Reverse direction (FI perspective):**
-See @../../modules/fi/integration.md for how FI views these automatic postings
-```
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Monolithic Module Files
-
-**What:** Putting all MM content in a single 2000-line `mm.md` file.
-**Why bad:** Wastes context window. When Claude needs one T-code, it loads everything about MM. Claude Code truncates lines over 2000 characters and the file becomes unwieldy.
-**Instead:** Split by concern (tcodes, config, processes, integration, patterns). Each file stays under 500 lines ideally, 800 max.
-
-### Anti-Pattern 2: Generic SAP Content Without ECC 6 Specificity
-
-**What:** Writing "you can configure account determination in SAP" without specifying ECC 6 behavior.
-**Why bad:** This is exactly the problem the KB exists to solve. Claude already knows generic SAP. It needs ECC 6-specific paths, behaviors, and gotchas.
-**Instead:** Every statement should be ECC 6-verified. Where S/4HANA differs, call it out explicitly.
-
-### Anti-Pattern 3: Loading Everything Into .claude/rules/
-
-**What:** Putting all SAP content files into `.claude/rules/` so they auto-load every session.
-**Why bad:** `.claude/rules/` content loads into context at session start, every session. 4 modules x 7 files = 28 files always consuming context window, even when the user asks about something unrelated to SAP.
-**Instead:** Only put the index/routing/disambiguation content in rules/. Put substantive content in module directories for on-demand loading.
-
-### Anti-Pattern 4: Orphaned Cross-References
-
-**What:** Mentioning "see the FI integration" without an @import link.
-**Why bad:** Claude cannot reliably navigate without explicit paths. Vague references create dead ends.
-**Instead:** Always use `@relative/path/to/file.md` for cross-references. Claude Code resolves these and can follow them.
-
-## Cross-Referencing Strategy
-
-### Three Tiers of Reference
-
-**Tier 1 -- Always Available (rules/):**
-The integration-map.md in `.claude/rules/` is the master cross-reference index. It lists every integration point with the file path to detailed documentation. This is always in context so Claude can route any cross-module question.
-
-```markdown
-# SAP ECC 6 Integration Map
-
-## MM <-> FI
-| Touchpoint | Trigger | MM File | FI File |
-|------------|---------|---------|---------|
-| Goods receipt posting | MIGO (mvt 101) | @../modules/mm/integration.md | @../modules/fi/integration.md |
-| Invoice verification | MIRO | @../modules/mm/integration.md | @../modules/fi/integration.md |
-| Automatic account determination | OBYC | @../modules/mm/config-spro.md | @../modules/fi/config-spro.md |
-
-## SD <-> FI
-| Touchpoint | Trigger | SD File | FI File |
-|------------|---------|---------|---------|
-| Billing document posting | VF01 | @../modules/sd/integration.md | @../modules/fi/integration.md |
-| Revenue account determination | VKOA | @../modules/sd/config-spro.md | @../modules/fi/config-spro.md |
-```
-
-**Tier 2 -- Module-Level Integration Files:**
-Each module's `integration.md` documents outbound and inbound integration points from that module's perspective, with @import links to the other module's files.
-
-**Tier 3 -- End-to-End Process Files:**
-`cross-module/` directory contains full process walkthroughs (P2P, O2C, R2R) that stitch together content from multiple modules into a narrative flow.
-
-### Reference Resolution Order
-
-When Claude encounters a cross-module question:
-1. Check `integration-map.md` (always in context) for routing
-2. Open the relevant module's `integration.md` for detail
-3. If end-to-end process context needed, open `cross-module/{process}.md`
-4. For lookup values, open `reference/{topic}.md`
-
-## Suggested Build Order
-
-The build order follows SAP's own dependency chain: FI is the backbone that everything posts to, org structure must exist before module config, and cross-module content requires individual modules to exist first.
-
-### Phase 1: Foundation (Build First)
-
-**Why first:** Everything else depends on these. Org structure defines the entity hierarchy that every module's config references. FI is the universal integration target.
-
-1. `.claude/rules/sap-general.md` -- ECC 6 identity and disambiguation rules
-2. `.claude/rules/org-structure.md` -- Company code, plant, sales org, purchasing org, controlling area hierarchy
-3. `modules/fi/` -- FI is the integration backbone; MM, SD, and CO all post to FI
-4. `reference/ecc6-vs-s4.md` -- Disambiguation reference needed from day one
-
-**Dependency rationale:** You cannot document MM->FI postings without having the FI side documented. You cannot document SPRO config without the org structure reference.
-
-### Phase 2: Core Logistics
-
-**Why second:** MM and SD are the highest-usage modules and have the richest integration with FI.
-
-5. `modules/mm/` -- Procurement and inventory; heavy FI integration via OBYC
-6. `modules/sd/` -- Sales and billing; heavy FI integration via VKOA
-7. `.claude/rules/integration-map.md` -- Can now be populated with MM<->FI and SD<->FI touchpoints
-8. `reference/movement-types.md`, `reference/document-types.md`, `reference/posting-keys.md`
-
-**Dependency rationale:** MM and SD integration files reference FI content (built in Phase 1). The integration map needs at least two modules documented to be useful.
-
-### Phase 3: Controlling and Cross-Module
-
-**Why third:** CO depends on FI (cost element = G/L account in ECC 6) and on MM/SD for cost flows. Cross-module content requires all four modules.
-
-9. `modules/co/` -- Controlling; depends on FI for cost elements, MM for cost assignment
-10. `cross-module/procure-to-pay.md` -- Requires MM + FI
-11. `cross-module/order-to-cash.md` -- Requires SD + FI
-12. `cross-module/record-to-report.md` -- Requires FI + CO
-13. `cross-module/automatic-postings.md` -- Requires MM + SD + FI
-14. Update `integration-map.md` with CO integration points
-
-### Phase 4: Polish and Validation
-
-15. `cross-module/org-structure-design.md` -- Design guidance pulling from all modules
-16. Root `CLAUDE.md` and all module `CLAUDE.md` files -- Finalize routing/index content
-17. Validation pass: verify every @import resolves, every T-code is ECC 6 correct, every SPRO path is accurate
-
-## Scalability Considerations
-
-| Concern | 4 Modules (v1) | 8 Modules (v2: +PP, PM, QM, WM) | 12+ Modules |
-|---------|-----------------|-----------------------------------|-------------|
-| rules/ size | ~3 files, <150 lines total | ~3 files, ~250 lines | Split integration-map.md into integration-map-logistics.md, integration-map-finance.md |
-| Navigation | Module CLAUDE.md sufficient | Add `modules/CLAUDE.md` module selector | Consider categorized subdirs: `modules/logistics/mm/` |
-| Cross-module files | 5 files manageable | ~10 files, add process index | Process catalog with @import chains |
-| Context usage | Comfortable | Monitor rules/ total size | May need path-scoped rules via YAML frontmatter |
-
-## Context Window Budget Estimate
-
-| Content Tier | Estimated Size | Loading Behavior |
-|-------------|---------------|------------------|
-| `.claude/rules/` (3 files) | ~3,000-5,000 tokens | Always loaded |
-| Module CLAUDE.md (entered module) | ~500-800 tokens | On-demand per module |
-| Individual content file | ~1,500-3,000 tokens per file | On-demand when read |
-| Typical query loads | ~8,000-15,000 tokens total | 2-4 files per question |
-
-**Target:** Keep always-loaded content under 5,000 tokens. Keep individual files under 3,000 tokens. A typical SAP question should require loading 2-4 on-demand files, consuming roughly 10,000-15,000 tokens of context -- well within budget for Claude Code's working context.
+---
 
 ## Sources
 
-- [Claude Code Memory Documentation](https://code.claude.com/docs/en/memory) -- Official docs on CLAUDE.md hierarchy, .claude/rules/, @import syntax, loading behavior (HIGH confidence)
-- [Builder.io - How to Write a Good CLAUDE.md File](https://www.builder.io/blog/claude-md-guide) -- Best practices for CLAUDE.md organization (MEDIUM confidence)
-- [Anthropic Blog - Using CLAUDE.md Files](https://claude.com/blog/using-claude-md-files) -- Official guidance on CLAUDE.md usage patterns (HIGH confidence)
-- [SAP Community - Integration Point of MM-FI-SD](https://blogs.sap.com/2013/12/31/integration-point-of-mm-fi-sd-in-sap-erp/) -- Cross-module integration points (MEDIUM confidence)
-- [TutorialsPoint - SAP MM Enterprise Structure](https://www.tutorialspoint.com/sap_mm/sap_mm_enterprise_structure.md) -- Org structure hierarchy (MEDIUM confidence)
-- [ERPROOTS - SAP Organizational Structure](https://erproots.com/sap-organizational-structure/) -- Org unit relationships and assignments (MEDIUM confidence)
+- MCP specification (Tools): https://modelcontextprotocol.io/specification/2025-11-25/server/tools (HIGH confidence — official spec, fetched 2026-02-23)
+- MCP specification (Resources): https://modelcontextprotocol.io/specification/2025-11-25/server/resources (HIGH confidence — official spec, fetched 2026-02-23)
+- MCP Python quickstart: https://modelcontextprotocol.io/quickstart/server (HIGH confidence — official guide, fetched 2026-02-23)
+- MCP local deployment guide: https://modelcontextprotocol.io/docs/develop/connect-local-servers (HIGH confidence — official guide, fetched 2026-02-23)
+- Claude Code MCP registration format: `/home/corye/.claude/plugins/marketplaces/claude-plugins-official/external_plugins/context7/.mcp.json` (HIGH confidence — live config on this machine)
+- KB file structure: surveyed from `/home/corye/Claude/SAPKnowledge/` (HIGH confidence — actual files)
+- `validate.py` frontmatter parsing logic: read from `/home/corye/Claude/SAPKnowledge/scripts/validate.py` (HIGH confidence — actual file)
+- Python version: `python3 --version` = 3.14.2 (HIGH confidence — runtime check)
+
+---
+*Architecture research for: MCP server over SAP ECC 6.0 flat-file knowledge base*
+*Researched: 2026-02-23*
