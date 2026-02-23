@@ -122,3 +122,101 @@ def extract_disambiguation_rows(body: str, topic: str) -> str | None:
     if not matching:
         return None
     return "\n".join([header, separator] + matching)
+
+
+# Search scope allowlist: modules/, cross-module/, reference/ ONLY
+# Order: MM -> SD -> FI -> CO -> cross-module -> reference (locked decision)
+_SEARCH_DIRS = [
+    ("mm", "modules/mm"),
+    ("sd", "modules/sd"),
+    ("fi", "modules/fi"),
+    ("co", "modules/co"),
+    ("cross-module", "cross-module"),
+    ("reference", "reference"),
+]
+
+_HEADING_RE = re.compile(r"^#{1,3} ")
+
+
+def _get_ordered_kb_files() -> list[Path]:
+    """Return all .md files in module-priority order (allowlisted dirs only)."""
+    files = []
+    for _mod, rel_dir in _SEARCH_DIRS:
+        d = KB_ROOT / rel_dir
+        if d.is_dir():
+            files.extend(sorted(d.glob("*.md")))
+    return files
+
+
+def _nearest_heading(lines: list[str], idx: int) -> str:
+    """Walk backwards from idx to find nearest #{1,3} heading line."""
+    for i in range(idx, -1, -1):
+        if _HEADING_RE.match(lines[i]):
+            return lines[i].strip()
+    return ""
+
+
+def _excerpt(lines: list[str], idx: int, context: int = 2) -> str:
+    """Return up to context lines before + match line + context lines after."""
+    start = max(0, idx - context)
+    end = min(len(lines), idx + context + 1)
+    return "\n".join(lines[start:end]).strip()
+
+
+def _matches_query(line: str, tokens: list[str], phrase: bool) -> bool:
+    """Case-insensitive match: phrase for <=2 tokens, AND logic for 3+."""
+    lower = line.lower()
+    if phrase:
+        return " ".join(tokens) in lower
+    return all(t in lower for t in tokens)
+
+
+def search_kb(
+    query: str, max_results: int = 10, max_per_file: int = 3
+) -> tuple[list[dict], int]:
+    """
+    Search all KB files for query string.
+
+    Returns:
+        (results, total_match_count)
+        results: list of {"source": rel_path, "heading": str, "excerpt": str}
+        total_match_count: total lines matched (may be undercount if capped early)
+
+    Scope: modules/, cross-module/, reference/ only — never .planning/, .claude/, scripts/.
+    Ordering: MM -> SD -> FI -> CO -> cross-module -> reference (locked decision).
+    Multi-word: phrase match for 1-2 tokens, AND logic for 3+ (Claude's discretion per CONTEXT.md).
+    """
+    tokens = query.strip().lower().split()
+    if not tokens:
+        return [], 0
+
+    is_phrase = len(tokens) <= 2
+    results: list[dict] = []
+    total_count = 0
+
+    for filepath in _get_ordered_kb_files():
+        try:
+            text = filepath.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        lines = text.splitlines()
+        rel_path = str(filepath.relative_to(KB_ROOT))
+        file_hits = 0
+
+        for i, line in enumerate(lines):
+            if _matches_query(line, tokens, is_phrase):
+                total_count += 1
+                if file_hits < max_per_file and len(results) < max_results:
+                    results.append({
+                        "source": rel_path,
+                        "heading": _nearest_heading(lines, i),
+                        "excerpt": _excerpt(lines, i),
+                    })
+                    file_hits += 1
+
+        # Stop collecting after cap (simplified: stop scanning entirely)
+        if len(results) >= max_results:
+            break
+
+    return results, total_count
