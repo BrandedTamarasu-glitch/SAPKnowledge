@@ -257,7 +257,10 @@ Plans:
   2. Search results never return full file bodies — response stays within the 2000-token per-tool budget even for broad queries
   3. Search covers all KB content under modules/, cross-module/, and reference/ — and only those directories (no .planning/, .claude/, or scripts/ exposure)
   4. When a keyword matches no KB content, the tool returns a clear "no results" response rather than an error or empty response
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — search_kb() helper in kb_reader.py + search_by_keyword tool in mcp_server.py
 
 ### Phase 15: Deployment Documentation
 **Goal**: A non-developer colleague can configure the MCP server in both Claude Code and Claude Desktop by following the setup guide, without needing to understand Python packaging or MCP internals
@@ -290,5 +293,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 11. Cross-Module Integration | 3/3 | Complete    | 2026-02-18 |
 | 12. Solution Design Intelligence | 2/3 | In Progress|  |
 | 13. MCP Server Scaffold + P1 Tools | 2/2 | Complete    | 2026-02-23 |
-| 14. Keyword Search Tool | 0/TBD | Not started | - |
+| 14. Keyword Search Tool | 0/1 | Not started | - |
 | 15. Deployment Documentation | 0/TBD | Not started | - |
