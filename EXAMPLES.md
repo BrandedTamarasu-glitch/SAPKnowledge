@@ -840,6 +840,331 @@ asyncio.run(get_co_close_tcodes_via_mcp())
 
 ---
 
+---
+
+## Example 10: Internal Order Settlement — Query and Validate Process Flow
+
+Fetches the IO settlement process from the CO knowledge base, validates every step for T-code completeness, cross-references receiver types to their FI integration points, and verifies that cross-module T-codes exist in the KB — producing a pass/warn/fail report.
+
+```python
+import sys
+import re
+sys.path.insert(0, "scripts")
+
+from kb_reader import (
+    KB_ROOT, get_file_body, find_section_by_topic, extract_tcode_section,
+    parse_frontmatter, search_kb, TCODE_FILE, PROCESS_FILE,
+)
+
+# ── Load files once ──────────────────────────────────────────────────────────
+co_process_body, co_proc_src  = get_file_body(PROCESS_FILE, "CO")
+co_tcode_body,   co_tc_src    = get_file_body(TCODE_FILE,   "CO")
+fi_process_body, fi_proc_src  = get_file_body(PROCESS_FILE, "FI")
+fi_tcode_body,   fi_tc_src    = get_file_body(TCODE_FILE,   "FI")
+
+co_integration_path = KB_ROOT / "modules" / "co" / "integration.md"
+_, co_integration_body = parse_frontmatter(co_integration_path)
+
+
+# ── 1. Fetch the IO settlement process ───────────────────────────────────────
+
+def fetch_settlement_process() -> tuple[str, list[dict]]:
+    """
+    Locates the 'Internal Order Settlement' section in CO processes.md,
+    then parses its summary table into a list of step dicts.
+
+    Returns (raw_section_text, steps_list).
+    Raises ValueError if the section or table is not found.
+    """
+    section = find_section_by_topic(co_process_body, "Internal Order Settlement")
+    if section is None:
+        raise ValueError(
+            "Section 'Internal Order Settlement' not found in modules/co/processes.md. "
+            "Check that the file has not been restructured."
+        )
+
+    # Parse: | Step | Activity | T-code | Role | Output |
+    TABLE_ROW_RE = re.compile(
+        r"^\|\s*([^|\-][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|",
+        re.MULTILINE,
+    )
+    steps = []
+    for m in TABLE_ROW_RE.finditer(section):
+        step, activity, tcode_raw, role, output = (x.strip() for x in m.groups())
+        if step.lower() == "step" or not step:
+            continue
+        # Strip qualifiers like "(test)" from T-code strings
+        tcode_clean = re.sub(r"\(.*?\)", "", tcode_raw).strip()
+        steps.append({
+            "step":      step,
+            "activity":  activity,
+            "tcode_raw": tcode_raw,
+            "tcodes":    [t.strip().upper() for t in re.split(r"[\s/,]+", tcode_clean)
+                          if re.match(r"^[A-Z0-9]{2,10}$", t.strip())],
+            "role":      role,
+            "output":    output,
+        })
+
+    if not steps:
+        raise ValueError(
+            "Summary table not found inside 'Internal Order Settlement' section. "
+            f"Source: {co_proc_src}"
+        )
+    return section, steps
+
+
+# ── 2. Validate each step's T-codes against the KB ───────────────────────────
+
+def validate_step_tcodes(steps: list[dict]) -> list[dict]:
+    """
+    For every T-code in every step:
+      1. Try CO tcodes.md  (primary)
+      2. Try FI tcodes.md  (secondary — cross-module verification T-codes like FBL3N)
+      3. Fall back to search_kb across all KB files
+      4. Flag as MISSING if nothing found
+
+    Returns a list of validation result dicts.
+    """
+    results = []
+    for step in steps:
+        step_results = []
+        for tcode in step["tcodes"]:
+            # Primary: CO KB
+            if extract_tcode_section(co_tcode_body, tcode):
+                step_results.append({"tcode": tcode, "status": "PASS", "kb": co_tc_src})
+                continue
+            # Secondary: FI KB (for cross-module T-codes: FBL3N, AW01N, etc.)
+            if extract_tcode_section(fi_tcode_body, tcode):
+                step_results.append({"tcode": tcode, "status": "PASS", "kb": fi_tc_src,
+                                      "note": "found in FI KB (cross-module)"})
+                continue
+            # Fallback: keyword search
+            hits, _ = search_kb(f"{tcode} settlement internal order", max_results=3)
+            if hits:
+                step_results.append({"tcode": tcode, "status": "WARN",
+                                      "kb": hits[0]["source"],
+                                      "note": "found via search — no dedicated tcode entry"})
+            else:
+                step_results.append({"tcode": tcode, "status": "MISSING",
+                                      "kb": "", "note": "not found in KB"})
+
+        results.append({**step, "validation": step_results})
+    return results
+
+
+# ── 3. Fetch receiver types and their FI integration impact ──────────────────
+
+def fetch_receiver_integration_points() -> list[dict]:
+    """
+    Parses the 'Settlement Receiver Types' table from CO processes.md.
+    Table columns: Receiver Type | COBRB-KONTY | T-code to Verify | FI Document?
+    """
+    section = find_section_by_topic(co_process_body, "Settlement Receiver Types")
+    if section is None:
+        # Fall back to searching the integration catalog
+        results, _ = search_kb("settlement receiver types FI document CO", max_results=5)
+        return [{"source": r["source"], "excerpt": r["excerpt"]} for r in results]
+
+    ROW_RE = re.compile(
+        r"^\|\s*([^|\-][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|",
+        re.MULTILINE,
+    )
+    receivers = []
+    for m in ROW_RE.finditer(section):
+        recv_type, konty, verify_tcode_raw, fi_doc = (x.strip() for x in m.groups())
+        if recv_type.lower() in ("receiver type", "---") or not recv_type:
+            continue
+        # Normalize FI Document? field
+        creates_fi = fi_doc.strip().lower().startswith("yes")
+        verify_tcodes = [t.strip().upper() for t in re.split(r"[\s/,]+", verify_tcode_raw)
+                         if re.match(r"^[A-Z0-9]{2,10}$", t.strip())]
+        receivers.append({
+            "receiver_type":   recv_type,
+            "konty":           konty.strip(),
+            "verify_tcodes":   verify_tcodes,
+            "creates_fi_doc":  creates_fi,
+        })
+    return receivers
+
+
+# ── 4. Validate cross-module integration for FI-creating receivers ────────────
+
+def validate_fi_integration(receivers: list[dict]) -> list[dict]:
+    """
+    For each receiver type that creates an FI document (creates_fi_doc=True):
+      - Verify the T-code to verify exists in the FI KB
+      - Locate the relevant FI process section to confirm the flow is documented
+
+    Returns a list of integration validation results.
+    """
+    results = []
+    for recv in receivers:
+        if not isinstance(recv, dict) or "creates_fi_doc" not in recv:
+            continue
+        if not recv["creates_fi_doc"]:
+            results.append({**recv, "integration_status": "N/A (no FI document)"})
+            continue
+
+        fi_checks = []
+        for tcode in recv["verify_tcodes"]:
+            if extract_tcode_section(fi_tcode_body, tcode):
+                fi_checks.append({"tcode": tcode, "status": "PASS", "kb": fi_tc_src})
+            else:
+                # Check CO KB too (AW01N lives in CO)
+                if extract_tcode_section(co_tcode_body, tcode):
+                    fi_checks.append({"tcode": tcode, "status": "PASS", "kb": co_tc_src})
+                else:
+                    fi_checks.append({"tcode": tcode, "status": "WARN",
+                                       "kb": "", "note": "not found in KB"})
+
+        # Confirm the integration direction is documented in integration.md
+        integration_section = find_section_by_topic(co_integration_body, "CO -> FI")
+        integration_documented = integration_section is not None
+
+        results.append({
+            **recv,
+            "fi_tcode_checks":           fi_checks,
+            "integration_documented":    integration_documented,
+            "integration_status":        "PASS" if all(c["status"] == "PASS" for c in fi_checks)
+                                         else "WARN",
+        })
+    return results
+
+
+# ── 5. Run everything and print the validation report ────────────────────────
+
+print("=" * 70)
+print("INTERNAL ORDER SETTLEMENT — KB QUERY + VALIDATION REPORT")
+print("=" * 70)
+
+# Fetch process
+try:
+    settlement_section, steps = fetch_settlement_process()
+    print(f"\n✓ Process loaded: {len(steps)} steps  ({co_proc_src})")
+except ValueError as e:
+    print(f"\n✗ {e}")
+    sys.exit(1)
+
+# Validate T-codes
+validated_steps = validate_step_tcodes(steps)
+
+print("\n── STEP-BY-STEP VALIDATION ──")
+print(f"{'Step':<5}  {'T-code(s)':<22}  {'Activity':<30}  Status")
+print("-" * 70)
+for item in validated_steps:
+    tcode_str   = " / ".join(v["tcode"] for v in item["validation"])
+    statuses    = [v["status"] for v in item["validation"]]
+    overall     = "PASS" if all(s == "PASS" for s in statuses) \
+                  else ("WARN" if "MISSING" not in statuses else "FAIL")
+    flag        = {"PASS": "✓", "WARN": "?", "FAIL": "✗"}[overall]
+    print(f"{item['step']:<5}  {tcode_str:<22}  {item['activity'][:29]:<30}  {flag} {overall}")
+    for v in item["validation"]:
+        if v["status"] != "PASS":
+            print(f"       ↳ {v['tcode']}: {v['status']} — {v.get('note', '')}")
+
+# Fetch receiver types
+receivers = fetch_receiver_integration_points()
+print(f"\n── RECEIVER TYPES ({len(receivers)} found) ──")
+for r in receivers:
+    if not isinstance(r, dict) or "receiver_type" not in r:
+        continue
+    fi_flag = "→ creates FI doc" if r["creates_fi_doc"] else "  CO-internal only"
+    print(f"  {r['konty']:<6}  {r['receiver_type']:<30}  {fi_flag}")
+    print(f"         Verify via: {' / '.join(r['verify_tcodes'])}")
+
+# Validate FI integration
+fi_results = validate_fi_integration(receivers)
+fi_creating = [r for r in fi_results if isinstance(r, dict) and r.get("creates_fi_doc")]
+print(f"\n── FI INTEGRATION VALIDATION ({len(fi_creating)} FI-creating receivers) ──")
+for r in fi_creating:
+    print(f"\n  Receiver: {r['receiver_type']}  (KONTY={r['konty']})")
+    print(f"  Integration catalog documented: {'✓' if r['integration_documented'] else '✗'}")
+    for chk in r["fi_tcode_checks"]:
+        flag = "✓" if chk["status"] == "PASS" else "?"
+        note = f"  — {chk.get('note', '')}" if chk.get("note") else f"  ({chk['kb']})"
+        print(f"    {flag} {chk['tcode']}{note}")
+
+# Cross-module narrative: fetch integration catalog entry
+print("\n── CROSS-MODULE INTEGRATION EXCERPT ──")
+integration_section = find_section_by_topic(co_integration_body, "CO -> FI")
+if integration_section:
+    # Show just the table rows for settlement
+    for line in integration_section.splitlines():
+        if "KO88" in line or "settlement" in line.lower() or line.startswith("| CO"):
+            print(f"  {line.strip()}")
+else:
+    print("  Integration section not found — falling back to search")
+    hits, _ = search_kb("KO88 settlement FI document category 22", max_results=3)
+    for h in hits:
+        print(f"  [{h['source']}] {h['heading']}: {h['excerpt'][:120]}")
+
+print("\n" + "=" * 70)
+print("VALIDATION COMPLETE")
+```
+
+**Expected output (abbreviated):**
+```
+======================================================================
+INTERNAL ORDER SETTLEMENT — KB QUERY + VALIDATION REPORT
+======================================================================
+
+✓ Process loaded: 6 steps  (modules/co/processes.md)
+
+── STEP-BY-STEP VALIDATION ──
+Step   T-code(s)               Activity                        Status
+----------------------------------------------------------------------
+1      KOB1                    Review order actual costs        ✓ PASS
+2      KO02                    Verify settlement rule           ✓ PASS
+3      KO88                    Run settlement test              ✓ PASS
+4      KO88                    Execute settlement live          ✓ PASS
+5      KSB1 / FBL3N / AW01N   Verify receiver objects          ✓ PASS
+       ↳ FBL3N: found in FI KB (cross-module)
+6      KO02                    Set TECO (if done)               ✓ PASS
+
+── RECEIVER TYPES (6 found) ──
+  CTR    Cost Center                       CO-internal only
+         Verify via: KSB1
+  ORD    Internal Order                    CO-internal only
+         Verify via: KOB1
+  KST    GL Account                        → creates FI doc
+         Verify via: FBL3N
+  FXA    Fixed Asset / AUC                 → creates FI doc
+         Verify via: AW01N / AS03
+  PSP    WBS Element                       CO-internal only
+         Verify via: CJ03
+  RKS    CO-PA Segment                     CO-internal only
+         Verify via: KE24
+
+── FI INTEGRATION VALIDATION (2 FI-creating receivers) ──
+
+  Receiver: GL Account  (KONTY=KST)
+  Integration catalog documented: ✓
+    ✓ FBL3N  (modules/fi/tcodes.md)
+
+  Receiver: Fixed Asset / AUC  (KONTY=FXA)
+  Integration catalog documented: ✓
+    ✓ AW01N  (modules/co/tcodes.md)
+    ✓ AS03   (modules/fi/tcodes.md)
+```
+
+**Validation status legend:**
+- `✓ PASS` — T-code found in KB (CO or FI module)
+- `? WARN` — T-code found via `search_kb` fallback; no dedicated entry in tcodes.md
+- `✗ FAIL` — T-code not found anywhere in KB; requires manual verification
+
+**What the `find_section_by_topic` → `search_kb` fallback chain handles:**
+
+```python
+# Pattern used throughout:
+section = find_section_by_topic(body, "topic keyword")
+if section is None:
+    results, _ = search_kb("topic keyword cross-module", max_results=5)
+    # use results[0]["excerpt"] as fallback content
+    # never silently return empty — always surface what was found
+```
+
+---
+
 ## Key Files for CO Month-End Close
 
 | File | Contents |
