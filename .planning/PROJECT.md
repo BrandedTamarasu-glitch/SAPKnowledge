@@ -2,44 +2,58 @@
 
 ## What This Is
 
-A curated collection of structured markdown reference files covering SAP ECC 6.0, designed to be loaded into Claude Code's context to make it a reliable SAP solutioning assistant. The knowledge base covers transaction codes, configuration paths, business process mappings, integration points, and solution design patterns — all specific to ECC 6 (not S/4HANA).
+A curated collection of structured markdown reference files covering SAP ECC 6.0, designed to be loaded into Claude Code's context to make it a reliable SAP solutioning assistant. The knowledge base covers transaction codes, configuration paths, business process mappings, integration points, and solution design patterns — all specific to ECC 6 (not S/4HANA). In v1.1, a Model Context Protocol (MCP) server adds a programmatic query interface on top of the markdown content.
 
 ## Core Value
 
 When someone in the organization asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions — not a generic or S/4HANA-confused response.
 
+## Current Milestone: v1.1 — MCP Server
+
+**Goal:** Add a Model Context Protocol server that exposes the knowledge base as callable tools, enabling programmatic retrieval of SAP ECC 6 content by any MCP-capable client.
+
+**Target features:**
+- MCP server exposing search and retrieval tools over the KB markdown content
+- Tool to query by module, T-code, topic, or keyword
+- Tool to retrieve specific content files (tcodes, processes, config, integration)
+- Packaged and documented for local and org-wide deployment
+
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Curated T-code reference for MM, SD, FI, CO with descriptions, menu paths, and usage context — v1.0
+- ✓ SPRO/IMG configuration guides with step-by-step paths specific to ECC 6 — v1.0
+- ✓ Business process maps (procure-to-pay, order-to-cash, record-to-report) tied to transactions and config — v1.0
+- ✓ Module integration point documentation (MM→FI postings, SD→FI billing, CO→FI reconciliation, etc.) — v1.0
+- ✓ Org structure reference (company code, plant, storage location, sales org, purchasing org, controlling area) — v1.0
+- ✓ ECC 6 vs S/4HANA disambiguation — explicit callouts where behavior differs — v1.0
+- ✓ Solution design patterns — common business requirements mapped to SAP capabilities — v1.0
+- ✓ Markdown files structured for Claude Code context loading — v1.0
 
 ### Active
 
-- [ ] Curated T-code reference for MM, SD, FI, CO with descriptions, menu paths, and usage context
-- [ ] SPRO/IMG configuration guides with step-by-step paths specific to ECC 6
-- [ ] Business process maps (procure-to-pay, order-to-cash, record-to-report) tied to transactions and config
-- [ ] Module integration point documentation (MM→FI postings, SD→FI billing, CO→FI reconciliation, etc.)
-- [ ] Org structure reference (company code, plant, storage location, sales org, purchasing org, controlling area)
-- [ ] ECC 6 vs S/4HANA disambiguation — explicit callouts where behavior differs
-- [ ] Solution design patterns — common business requirements mapped to SAP capabilities
-- [ ] Markdown files structured for Claude Code context loading
+- [ ] MCP server exposing KB as queryable tools
+- [ ] Tool: search KB by keyword/topic across all modules
+- [ ] Tool: retrieve content by module + content type (tcodes, config, processes, integration)
+- [ ] Tool: look up a specific T-code and get its description, usage, and module context
+- [ ] Server packaged with setup instructions for local and shared deployment
 
 ### Out of Scope
 
 - S/4HANA-specific content — this is ECC 6 only, with S/4 noted only for disambiguation
 - Company-specific config values — this is general ECC 6 reference, not your system's specific settings
 - ABAP development reference — focus is functional solutioning, not custom code
-- MCP server infrastructure — delivering as flat markdown files, not a server
 - PP, PM, HCM modules — deferred to v2 after format is proven with MM/SD/FI/CO
+- REST API / hosted endpoint — MCP server is local/org deployment, not a public API
 
 ## Context
 
-- Target platform: Claude Code with markdown files loaded into context
+- Target platform: Claude Code with markdown files loaded into context (v1.0); MCP clients including Claude Desktop (v1.1)
 - SAP version: ECC 6.0 (EHP levels vary but content targets broadly applicable ECC 6 behavior)
 - Content sources: SAP Help Portal, public SAP documentation, curated from established SAP knowledge
 - Audience: Entire organization — must be accurate enough for non-SAP-experts to rely on
-- Pain points driving this: Claude currently confuses ECC 6 with S/4HANA, gives vague config advice, doesn't know correct T-codes/menu paths, and misses integration points between modules
+- v1.1 driver: External feedback that v1.0 lacks any programmatic interface for custom functions to query the KB directly (scored 0 on implementation, API, completeness)
 
 ## Constraints
 
@@ -47,15 +61,17 @@ When someone in the organization asks Claude "how do I do X in SAP," it gives th
 - **ECC 6 specificity**: Every piece of content must be validated as applicable to ECC 6.0, not assumed from S/4HANA docs
 - **Context window**: Markdown files must be structured so relevant content can be loaded selectively (not everything at once)
 - **No internal data**: Knowledge base contains only publicly available SAP reference information
+- **MCP compatibility**: Server must implement the MCP protocol spec correctly for Claude Desktop and Claude Code integration
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Markdown files over MCP server | Simpler, no infrastructure, portable, anyone with Claude Code can use | — Pending |
-| Prioritize MM/SD/FI/CO for v1 | Core logistics and finance modules, highest org usage, proves format before expanding | — Pending |
-| ECC 6 only, S/4 disambiguation | Prevents the #1 pain point — Claude mixing up ECC and S/4 behavior | — Pending |
-| Public sources only | Keeps knowledge base shareable, avoids internal data concerns | — Pending |
+| Markdown files over MCP server | Simpler, no infrastructure, portable, anyone with Claude Code can use | ✓ Good — v1.0 shipped, but programmatic access gap identified |
+| Prioritize MM/SD/FI/CO for v1 | Core logistics and finance modules, highest org usage, proves format before expanding | ✓ Good |
+| ECC 6 only, S/4 disambiguation | Prevents the #1 pain point — Claude mixing up ECC and S/4 behavior | ✓ Good |
+| Public sources only | Keeps knowledge base shareable, avoids internal data concerns | ✓ Good |
+| Add MCP server in v1.1 | v1.0 feedback scored 0 on API/implementation; additive layer keeps markdown KB intact | — Pending |
 
 ---
-*Last updated: 2026-02-16 after initialization*
+*Last updated: 2026-02-23 after v1.1 milestone start*
