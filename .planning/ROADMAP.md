@@ -242,7 +242,11 @@ Plans:
   3. User can call lookup_tcode with any MM/SD/FI/CO T-code and receive its description, module, menu path, and usage context — sourced from section-level KB extraction, not full file dump
   4. User can call get_module_overview, get_config_path, get_process_flow, and compare_ecc_s4 and receive targeted KB excerpts scoped to the query (not full file bodies)
   5. All five tool descriptions route correctly when tested against 10 representative SAP queries in MCP Inspector — no tool is invoked for queries outside its scope
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — KB extraction helpers (kb_reader.py), fastmcp dependency pin, .gitignore
+- [ ] 13-02-PLAN.md — Five MCP tools (mcp_server.py) and server registration (.mcp.json)
 
 ### Phase 14: Keyword Search Tool
 **Goal**: Users can search the full KB by keyword and receive ranked excerpts with source attribution when no specific P1 tool matches their query
@@ -285,6 +289,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 10. CO Advanced & FI Integration | 3/3 | Complete    | 2026-02-17 |
 | 11. Cross-Module Integration | 3/3 | Complete    | 2026-02-18 |
 | 12. Solution Design Intelligence | 2/3 | In Progress|  |
-| 13. MCP Server Scaffold + P1 Tools | 0/TBD | Not started | - |
+| 13. MCP Server Scaffold + P1 Tools | 0/2 | Not started | - |
 | 14. Keyword Search Tool | 0/TBD | Not started | - |
 | 15. Deployment Documentation | 0/TBD | Not started | - |
