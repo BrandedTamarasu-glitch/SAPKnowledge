@@ -1187,3 +1187,2730 @@ if section is None:
 | `modules/fi/processes.md` | Business process flows: GL posting cycle, month-end close, F110 payment run, financial reporting |
 | `modules/mm/account-determination.md` | MM-side OBYC setup detail (valuation class, movement type configuration) |
 | `cross-module/order-to-cash.md` | End-to-end O2C flow including SD → FI posting touchpoints |
+
+---
+
+## Example 11: Design Patterns with SPRO Configuration Paths
+
+Retrieves module-specific design patterns from `cross-module/design-patterns.md`, then enriches each pattern's configuration steps with the corresponding detailed SPRO path from the module's `config-spro.md`. Demonstrates multi-file chaining, iteration over multiple modules, response aggregation, and a three-tier fallback that always returns actionable content.
+
+```python
+import sys
+import re
+sys.path.insert(0, "scripts")
+
+from pathlib import Path
+from kb_reader import (
+    KB_ROOT, get_file_body, parse_frontmatter,
+    find_section_by_topic, search_kb, normalize_module, CONFIG_FILE,
+)
+
+
+# ── Helper: normalize module variants found in design-patterns.md tables ─────
+#
+# Config tables use values like "CO-PC", "CO (CCA)", "MM/PP", "FI-AA".
+# normalize_module() only accepts exact names (MM, SD, FI, CO).
+# This helper extracts the base module so we can load the right config-spro.md.
+
+_BASE_MODULE_RE = re.compile(r"^(MM|SD|FI|CO)", re.IGNORECASE)
+
+def _base_module(raw: str) -> str | None:
+    """Return the KB module name for a raw table value like 'CO-PC' or 'MM/PP'."""
+    m = _BASE_MODULE_RE.match(raw.strip())
+    if m:
+        return normalize_module(m.group(1).upper())
+    return None
+
+
+# ── Helper: extract the best search keyword from a T-code/SPRO path string ───
+#
+# Examples of what appears in design-patterns.md config tables:
+#   "OKKN — costing variant settings"
+#   "SPRO → CO → Product Cost → Overhead → Define Costing Sheets"
+#   "ME21N — account assignment category F (order) or P (project)"
+#   "OKO7 — allowed receiver types (cost center, GL, asset, WBS)"
+
+def _topic_keyword(tcode_spro: str) -> str:
+    """Return the single best keyword to use for find_section_by_topic()."""
+    # Try to extract a leading T-code (2-10 uppercase alphanums before " —" or " -")
+    tcode_match = re.match(r"([A-Z0-9/_]{2,10})\s*[—\-]", tcode_spro)
+    if tcode_match:
+        return tcode_match.group(1)   # e.g. "OKKN", "OKO7", "KOT2"
+
+    # For pure SPRO paths, take the last navigation segment
+    spro_segment = re.search(r"→\s*([^→]+)$", tcode_spro)
+    if spro_segment:
+        return spro_segment.group(1).strip()[:60]
+
+    # Fallback: first meaningful phrase before any parenthesis
+    return re.sub(r"\s*\(.*", "", tcode_spro).strip()[:60]
+
+
+def _description_keyword(tcode_spro: str) -> str | None:
+    """Return the phrase after the '—' separator as a secondary search term."""
+    desc_match = re.search(r"[—\-]\s*(.+)$", tcode_spro)
+    if desc_match:
+        # Take first few meaningful words, strip parenthetical details
+        phrase = re.sub(r"\s*\(.*?\)", "", desc_match.group(1)).strip()
+        return phrase[:60] if phrase else None
+    return None
+
+
+# ── Load config-spro.md for each required module (once per module) ────────────
+
+def _load_module_configs(modules: set[str]) -> dict[str, tuple[str, str]]:
+    """
+    Load config-spro.md body and source path for each module in `modules`.
+    Returns {module: (body, source)}.  Missing files return ("", "").
+    """
+    configs: dict[str, tuple[str, str]] = {}
+    for mod in modules:
+        try:
+            body, source = get_file_body(CONFIG_FILE, mod)
+            configs[mod] = (body, source)
+        except (FileNotFoundError, ValueError, KeyError):
+            configs[mod] = ("", "")
+    return configs
+
+
+# ── Parse design-patterns.md into structured pattern dicts ───────────────────
+
+def parse_design_patterns(
+    pattern_keywords: list[str] | None = None,
+) -> list[dict]:
+    """
+    Parse cross-module/design-patterns.md.
+
+    Each returned dict contains:
+        pattern_number (int)     — 1-based pattern index
+        pattern_name   (str)     — e.g. "Make-to-Stock Production with Standard Costing"
+        description    (str)     — business requirement text
+        approach       (str)     — SAP ECC 6 approach text
+        when_to_use    (str)     — when-to-use guidance
+        config_steps   (list)    — one dict per config table row:
+            module         (str) — raw module from table (e.g. "CO-PC", "MM/PP")
+            step           (str) — config step description
+            tcode_spro_raw (str) — T-code / SPRO path as written in the KB
+            spro_detail    (None) — filled in by enrich_with_spro_paths()
+            spro_source    (None) — filled in by enrich_with_spro_paths()
+
+    Raises FileNotFoundError if design-patterns.md is missing.
+    """
+    patterns_path = KB_ROOT / "cross-module" / "design-patterns.md"
+    if not patterns_path.exists():
+        raise FileNotFoundError(f"design-patterns.md not found: {patterns_path}")
+
+    _, body = parse_frontmatter(patterns_path)
+
+    # Split on "## Pattern N:" boundaries
+    sections = re.split(r"(?=^## Pattern \d+:)", body, flags=re.MULTILINE)
+
+    # Table row pattern — 3 columns: Module | Config Step | T-code/SPRO
+    TABLE_ROW_RE = re.compile(
+        r"^\|\s*([^|\-][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|",
+        re.MULTILINE,
+    )
+
+    patterns = []
+    for section in sections:
+        if not section.startswith("## Pattern"):
+            continue
+
+        header_match = re.match(r"## Pattern (\d+):\s*(.+)", section)
+        if not header_match:
+            continue
+        number = int(header_match.group(1))
+        name   = header_match.group(2).strip()
+
+        # Early keyword filter — avoids loading SPRO for irrelevant patterns
+        if pattern_keywords:
+            lower = section.lower()
+            if not any(kw.lower() in lower for kw in pattern_keywords):
+                continue
+
+        def _extract(field_label: str) -> str:
+            m = re.search(
+                rf"\*\*{re.escape(field_label)}:\*\*\s*(.+?)(?=\n\n|\*\*[A-Z])",
+                section, re.DOTALL,
+            )
+            return m.group(1).strip() if m else ""
+
+        description = _extract("Business requirement")
+        approach    = _extract("SAP ECC 6 approach")
+        when_to_use = _extract("When to use")
+
+        # Parse the ### Configuration Summary table (not other tables in the section)
+        cfg_section_match = re.search(
+            r"### Configuration Summary\n(.+?)(?=\n### |\n## |$)",
+            section, re.DOTALL,
+        )
+        cfg_text = cfg_section_match.group(1) if cfg_section_match else ""
+
+        config_steps = []
+        for m in TABLE_ROW_RE.finditer(cfg_text):
+            mod_raw, step, tcode_spro = (x.strip() for x in m.groups())
+            # Skip header and divider rows
+            if mod_raw.lower() in ("module", "") or re.match(r"^[-|: ]+$", mod_raw):
+                continue
+            config_steps.append({
+                "module":         mod_raw,        # preserve original (e.g. "CO-PC")
+                "step":           step,
+                "tcode_spro_raw": tcode_spro,
+                "spro_detail":    None,           # filled by enrich_with_spro_paths()
+                "spro_source":    None,
+            })
+
+        patterns.append({
+            "pattern_number": number,
+            "pattern_name":   name,
+            "description":    description,
+            "approach":       approach,
+            "when_to_use":    when_to_use,
+            "config_steps":   config_steps,
+        })
+
+    return patterns
+
+
+# ── Enrich each config step with a detailed SPRO path ─────────────────────────
+
+def enrich_with_spro_paths(
+    patterns: list[dict],
+    modules_filter: list[str] | None = None,
+) -> list[dict]:
+    """
+    For every config step in every pattern, look up the SPRO detail in the
+    module's config-spro.md and store it in step["spro_detail"].
+
+    Lookup strategy (three-tier fallback — never silently returns empty):
+      1. find_section_by_topic(config_body, T-code)         ← fast, exact
+      2. find_section_by_topic(config_body, description kw) ← broader match
+      3. search_kb(topic + module + "configuration")        ← cross-KB fallback
+
+    Args:
+        patterns:       Output of parse_design_patterns().
+        modules_filter: If provided, only enrich steps for these modules.
+                        e.g. ["MM", "FI"] — skips CO and SD enrichment.
+                        None = enrich all modules.
+
+    Returns the enriched patterns list (mutated in-place and returned).
+    """
+    norm_filter = (
+        {normalize_module(m) for m in modules_filter if normalize_module(m)}
+        if modules_filter else None
+    )
+
+    # Determine which base modules we actually need to load
+    needed: set[str] = set()
+    for p in patterns:
+        for step in p["config_steps"]:
+            mod = _base_module(step["module"])
+            if mod and (norm_filter is None or mod in norm_filter):
+                needed.add(mod)
+
+    configs = _load_module_configs(needed)
+
+    for pattern in patterns:
+        for step in pattern["config_steps"]:
+            mod = _base_module(step["module"])
+
+            # Skip modules not in filter or not in KB
+            if mod is None or (norm_filter and mod not in norm_filter):
+                continue
+            config_body, config_source = configs.get(mod, ("", ""))
+            if not config_body:
+                continue
+
+            tcode_spro = step["tcode_spro_raw"]
+            primary_kw   = _topic_keyword(tcode_spro)
+            secondary_kw = _description_keyword(tcode_spro)
+
+            # Tier 1: T-code or last SPRO segment
+            detail = find_section_by_topic(config_body, primary_kw)
+
+            # Tier 2: description keyword (e.g. "costing variant", "settlement profile")
+            if detail is None and secondary_kw:
+                detail = find_section_by_topic(config_body, secondary_kw)
+
+            # Tier 3: keyword search across all KB files
+            if detail is None:
+                query = f"{primary_kw} {mod} SPRO configuration"
+                hits, _ = search_kb(query, max_results=3)
+                if hits:
+                    detail = f"(via search — no dedicated config section)\n{hits[0]['excerpt']}"
+                    config_source = hits[0]["source"]
+
+            step["spro_detail"] = detail
+            step["spro_source"] = config_source if detail else None
+
+    return patterns
+
+
+# ── Top-level function ────────────────────────────────────────────────────────
+
+def get_design_patterns_with_spro(
+    pattern_keywords: list[str] | None = None,
+    modules_filter:   list[str] | None = None,
+) -> list[dict]:
+    """
+    Retrieve SAP ECC 6 design patterns enriched with their SPRO config paths.
+
+    Args:
+        pattern_keywords: Filter patterns by keyword (e.g. ["consignment"]).
+                          None returns all patterns.
+        modules_filter:   Limit SPRO enrichment to specific modules
+                          (e.g. ["MM", "FI"]). None enriches all modules.
+
+    Returns:
+        List of pattern dicts. Each dict contains:
+            pattern_number (int)
+            pattern_name   (str)
+            description    (str)
+            approach       (str)
+            when_to_use    (str)
+            config_steps   (list[dict]):
+                module         (str)     — raw module from table ("CO-PC", "MM", ...)
+                step           (str)     — what to configure
+                tcode_spro_raw (str)     — T-code / SPRO path from design-patterns.md
+                spro_detail    (str|None)— full config section from config-spro.md
+                spro_source    (str|None)— source file for spro_detail
+
+    Raises:
+        FileNotFoundError: design-patterns.md is missing.
+        ValueError:        No patterns match the given keywords.
+    """
+    patterns = parse_design_patterns(pattern_keywords)
+    if not patterns:
+        raise ValueError(
+            f"No design patterns match keywords: {pattern_keywords}. "
+            "See cross-module/design-patterns.md for available patterns."
+        )
+    return enrich_with_spro_paths(patterns, modules_filter)
+
+
+# ── Print helpers ─────────────────────────────────────────────────────────────
+
+def print_summary_table(patterns: list[dict]) -> None:
+    """Print a SPRO-coverage summary across all patterns."""
+    print(f"\n{'#':<4}  {'Pattern Name':<46}  {'Steps':<6}  SPRO Coverage")
+    print("-" * 72)
+    for p in patterns:
+        total = len(p["config_steps"])
+        found = sum(1 for s in p["config_steps"] if s["spro_detail"])
+        bar   = "█" * found + "░" * (total - found)
+        print(f"{p['pattern_number']:<4}  {p['pattern_name'][:45]:<46}  {total:<6}  {bar} ({found}/{total})")
+
+
+def print_pattern_detail(pattern: dict, max_spro_chars: int = 300) -> None:
+    """Print one pattern with its enriched SPRO config paths."""
+    print(f"\n{'=' * 70}")
+    print(f"Pattern {pattern['pattern_number']}: {pattern['pattern_name']}")
+    print("=" * 70)
+    print(f"\nBusiness requirement:\n  {pattern['description'][:250]}")
+    print(f"\nWhen to use:\n  {pattern['when_to_use'][:200]}")
+    print(f"\nConfiguration steps ({len(pattern['config_steps'])} total):")
+    print("-" * 70)
+
+    for i, step in enumerate(pattern["config_steps"], 1):
+        found = "✓" if step["spro_detail"] else "·"
+        print(f"\n  [{found}] {step['module']} — {step['step']}")
+        print(f"      T-code/SPRO:  {step['tcode_spro_raw']}")
+        if step["spro_detail"]:
+            excerpt = step["spro_detail"][:max_spro_chars]
+            if len(step["spro_detail"]) > max_spro_chars:
+                excerpt += "..."
+            src = step["spro_source"] or ""
+            print(f"      Detail ({src}):")
+            for line in excerpt.splitlines()[:6]:
+                print(f"        {line}")
+        else:
+            print(f"      Detail: not in config-spro.md — use T-code directly")
+
+
+# ── Demonstrate all four use cases ────────────────────────────────────────────
+
+# ── Use case 1: Summary view across all 12 patterns ──────────────────────────
+print("=" * 70)
+print("USE CASE 1 — All 12 patterns: SPRO coverage summary")
+print("=" * 70)
+
+all_patterns = get_design_patterns_with_spro()
+print_summary_table(all_patterns)
+
+
+# ── Use case 2: Single pattern, full SPRO detail ──────────────────────────────
+print("\n\n" + "=" * 70)
+print("USE CASE 2 — Pattern 3 (Consignment): full SPRO enrichment")
+print("=" * 70)
+
+consignment = get_design_patterns_with_spro(pattern_keywords=["consignment"])
+for p in consignment:
+    print_pattern_detail(p)
+
+
+# ── Use case 3: Module-filtered SPRO paths ────────────────────────────────────
+print("\n\n" + "=" * 70)
+print("USE CASE 3 — Pattern 1 (Make-to-Stock): MM and FI SPRO paths only")
+print("=" * 70)
+
+mts = get_design_patterns_with_spro(
+    pattern_keywords=["Make-to-Stock"],
+    modules_filter=["MM", "FI"],
+)
+for p in mts:
+    mm_fi = [s for s in p["config_steps"] if _base_module(s["module"]) in ("MM", "FI")]
+    print(f"\nPattern: {p['pattern_name']}  ({len(mm_fi)} MM/FI steps)")
+    for step in mm_fi:
+        flag = "✓" if step["spro_detail"] else "·"
+        print(f"  [{flag}] [{step['module']}]  {step['step']}")
+        if step["spro_detail"]:
+            print(f"         Source: {step['spro_source']}")
+            print(f"         Detail: {step['spro_detail'][:160].splitlines()[0]}")
+
+
+# ── Use case 4: Cross-pattern SPRO index aggregated by module ─────────────────
+print("\n\n" + "=" * 70)
+print("USE CASE 4 — SPRO index: all enriched steps aggregated by module")
+print("=" * 70)
+
+spro_index: dict[str, list[dict]] = {}
+for p in all_patterns:
+    for step in p["config_steps"]:
+        mod = _base_module(step["module"]) or step["module"]
+        if step["spro_detail"]:
+            spro_index.setdefault(mod, []).append({
+                "pattern": f"Pattern {p['pattern_number']}: {p['pattern_name'][:35]}",
+                "step":    step["step"][:55],
+                "source":  step["spro_source"],
+            })
+
+for mod in sorted(spro_index):
+    entries = spro_index[mod]
+    print(f"\n{mod}  ({len(entries)} steps with SPRO detail across all patterns):")
+    for e in entries:
+        print(f"  • [{e['pattern']}]")
+        print(f"    {e['step']}  ← {e['source']}")
+```
+
+**Expected output (abbreviated):**
+
+```
+======================================================================
+USE CASE 1 — All 12 patterns: SPRO coverage summary
+======================================================================
+
+#     Pattern Name                                    Steps   SPRO Coverage
+------------------------------------------------------------------------
+1     Make-to-Stock Production with Standard Costi    6       ████░░ (4/6)
+2     Engineer-to-Order with Project Cost Collecti    6       ████░░ (4/6)
+3     Consignment Stock Management                    6       ████░░ (4/6)
+4     Third-Party Drop Shipment                       6       ███░░░ (3/6)
+5     Intercompany Sales (Cross-Company-Code Billi    7       █████░ (5/7)
+...
+12    Revenue Recognition (POC/Completed-Contract)    5       ███░░  (3/5)
+
+======================================================================
+USE CASE 2 — Pattern 3 (Consignment): full SPRO enrichment
+======================================================================
+
+Pattern 3: Consignment Stock Management
+======================================================================
+
+Business requirement:
+  Track inventory that remains vendor-owned while stored in your warehouse
+  (vendor consignment), OR track your own inventory stored at customer sites...
+
+Configuration steps (6 total):
+----------------------------------------------------------------------
+
+  [·] MM — Consignment info record
+      T-code/SPRO:  ME11 — info category = Consignment; vendor + material...
+      Detail: not in config-spro.md — use T-code directly
+
+  [✓] SD — Item category determination for consignment
+      T-code/SPRO:  VOV7 + OVLP — item categories KB/KE/KR/KA
+      Detail (modules/sd/config-spro.md):
+        ### VOV7 — Define Item Categories
+        **SPRO Path:** Sales and Distribution → Sales → Sales Documents →...
+        **Usage:** Controls billing relevance, delivery, special stock ind...
+
+  [✓] SD — Schedule line category for consignment movements
+      T-code/SPRO:  VOV6 — movement types 631/632/633/634
+      Detail (modules/sd/config-spro.md):
+        ### VOV6 — Define Schedule Line Categories
+        ...
+
+  [✓] FI — OBYC KON key for consignment payable
+      T-code/SPRO:  OBYC → KON — payable account for vendor consignment...
+      Detail (modules/fi/config-spro.md):
+        ### OBYC — Automatic Postings Configuration
+        ...
+```
+
+**Return value shape:**
+
+```python
+[
+    {
+        "pattern_number": 3,
+        "pattern_name": "Consignment Stock Management",
+        "description": "Track inventory that remains vendor-owned...",
+        "approach": "Use special stock indicator K (vendor consignment)...",
+        "when_to_use": "Vendor retains ownership until you withdraw...",
+        "config_steps": [
+            {
+                "module":         "MM",
+                "step":           "Consignment info record",
+                "tcode_spro_raw": "ME11 — info category = Consignment...",
+                "spro_detail":    None,       # ME11 not in config-spro.md
+                "spro_source":    None,
+            },
+            {
+                "module":         "SD",
+                "step":           "Item category determination for consignment",
+                "tcode_spro_raw": "VOV7 + OVLP — item categories KB/KE/KR/KA",
+                "spro_detail":    "### VOV7 — Define Item Categories\n...",
+                "spro_source":    "modules/sd/config-spro.md",
+            },
+            ...
+        ],
+    },
+    ...
+]
+```
+
+**Three-tier fallback chain:**
+
+```
+_topic_keyword("OKKN — costing variant settings") → "OKKN"
+  → find_section_by_topic(co_config_body, "OKKN")         # Tier 1: T-code heading
+      → None (OKKN not a section heading)
+  → find_section_by_topic(co_config_body, "costing variant")  # Tier 2: description kw
+      → "### Costing Variant Configuration\n..."           # ✓ found
+      → stop
+
+_topic_keyword("SPRO → FI-AA → Asset Classes → Define Asset Classes for AUC") → "Define Asset Classes for AUC"
+  → find_section_by_topic(fi_config_body, "Define Asset Classes for AUC")
+      → "### Asset Class Configuration\n..."               # ✓ found
+      → stop
+
+_topic_keyword("ME11 — info category = Consignment...") → "ME11"
+  → find_section_by_topic(mm_config_body, "ME11")          # Tier 1: not a section
+      → None
+  → find_section_by_topic(mm_config_body, "info category") # Tier 2: not a section
+      → None
+  → search_kb("ME11 MM SPRO configuration", max_results=3) # Tier 3: cross-KB
+      → [{source: "modules/mm/master-data.md", excerpt: "..."}]
+      → spro_detail = "(via search...)\n..."
+```
+
+Steps not found via any tier return `spro_detail = None` — the raw `tcode_spro_raw` is always present as the minimum reference.
+
+---
+
+**MCP equivalent — retrieve patterns and SPRO paths via the server:**
+
+```python
+import asyncio
+import re
+from fastmcp import Client
+
+
+async def get_patterns_with_spro_mcp():
+    """
+    Equivalent workflow using the MCP server.
+
+    For each pattern, combines:
+      - get_module_overview()  — lists what each module's config-spro.md covers
+      - get_config_path()      — retrieves a specific SPRO section by topic
+      - search_by_keyword()    — fallback when get_config_path() finds nothing
+
+    Note: The MCP server does not expose design-patterns.md directly.
+    Use kb_reader.py (above) to parse patterns, then enrich via MCP tools.
+    """
+    async with Client("scripts/mcp_server.py") as client:
+
+        # ── Step 1: Retrieve the consignment pattern config steps ─────────────
+        # search_by_keyword covers all KB files including design-patterns.md
+        pattern_hits = await client.call_tool("search_by_keyword", {
+            "query": "consignment stock management configuration pattern"
+        })
+        print("=== Pattern: Consignment Config Steps ===")
+        print(pattern_hits.content[0].text[:1500])
+
+        # ── Step 2: Get SPRO paths for each config step ───────────────────────
+        # Drive the topic from what the pattern references
+
+        # VOV7 — SD item category config
+        vov7_config = await client.call_tool("get_config_path", {
+            "module": "SD",
+            "topic":  "item categories"
+        })
+        print("\n=== SD SPRO: Item Category Configuration (VOV7) ===")
+        print(vov7_config.content[0].text[:800])
+
+        # OBYC KON — FI automatic postings for consignment payable
+        obyc_config = await client.call_tool("get_config_path", {
+            "module": "FI",
+            "topic":  "automatic postings"
+        })
+        print("\n=== FI SPRO: Automatic Postings (OBYC / KON) ===")
+        print(obyc_config.content[0].text[:800])
+
+        # VTFL — copy control for consignment billing
+        vtfl_config = await client.call_tool("get_config_path", {
+            "module": "SD",
+            "topic":  "copy control"
+        })
+        print("\n=== SD SPRO: Copy Control (VTFL) ===")
+        print(vtfl_config.content[0].text[:800])
+
+        # VKOA — SD revenue account determination (consignment issue billing)
+        vkoa_config = await client.call_tool("get_config_path", {
+            "module": "SD",
+            "topic":  "revenue account determination"
+        })
+        print("\n=== SD SPRO: VKOA Revenue Account Determination ===")
+        print(vkoa_config.content[0].text[:800])
+
+        # ── Step 3: Aggregate into a single result dict ───────────────────────
+        enriched_pattern = {
+            "pattern_name":  "Consignment Stock Management",
+            "config_steps": [
+                {
+                    "module": "SD", "step": "Item category determination",
+                    "spro_detail": vov7_config.content[0].text,
+                },
+                {
+                    "module": "SD", "step": "Copy control for consignment billing",
+                    "spro_detail": vtfl_config.content[0].text,
+                },
+                {
+                    "module": "SD", "step": "VKOA for consignment issue billing",
+                    "spro_detail": vkoa_config.content[0].text,
+                },
+                {
+                    "module": "FI", "step": "OBYC KON key for consignment payable",
+                    "spro_detail": obyc_config.content[0].text,
+                },
+            ],
+        }
+
+        print(f"\n=== Aggregated result: {len(enriched_pattern['config_steps'])} steps ===")
+        for step in enriched_pattern["config_steps"]:
+            lines = step["spro_detail"].splitlines()
+            heading = next((l for l in lines if l.startswith("#")), "(no heading)")
+            print(f"  [{step['module']}] {step['step']}")
+            print(f"         → {heading}")
+
+        return enriched_pattern
+
+
+asyncio.run(get_patterns_with_spro_mcp())
+```
+
+**`get_config_path` vs direct file parsing — when to use which:**
+
+| Approach | When to use | Advantage |
+|----------|-------------|-----------|
+| `kb_reader.py` (direct) | Batch enrichment of all patterns | One file load per module; loop over all steps |
+| MCP `get_config_path` | Interactive / LLM-driven lookup | No file path knowledge needed; natural language topic |
+| MCP `search_by_keyword` | T-code not in config-spro.md | Searches all KB files, including processes and advanced content |
+
+---
+
+## Key Files for Design Patterns + SPRO Configuration
+
+| File | Contents |
+|------|----------|
+| `cross-module/design-patterns.md` | 12 named patterns: business requirement → SAP approach → Configuration Summary table (Module, Config Step, T-code/SPRO Path) → testing steps |
+| `modules/mm/config-spro.md` | MM SPRO paths: OMR6 tolerances, OMWM valuation level, OMWC split valuation, OBYC account keys, GR/IR config |
+| `modules/sd/config-spro.md` | SD SPRO paths: VOV7/VOV8 document types, VOV6 schedule lines, VTFL/VTAF copy control, VKOA, OVKK pricing, OVZ2 ATP |
+| `modules/fi/config-spro.md` | FI SPRO paths: FBZP payment program, OBB8 payment terms, OBYC automatic postings, AA config chain (EC08→OAOB→OAOA→AO90→AFAMA) |
+| `modules/co/config-spro.md` | CO SPRO paths: OKKP controlling area, OKKN costing variant, OKO7 settlement profile, OKO6 allocation structure, OKP1 period lock |
+
+---
+
+## Example 12: MM Account Determination Failure — Query Construction and Diagnosis
+
+Constructs targeted KB queries from a failure description, chains MM and FI sources to diagnose the root cause, and returns a structured resolution guide. Demonstrates how to parse failure context (SAP message IDs, movement types, T-codes) into precise KB queries, with a three-file lookup chain and `search_kb` fallback for every step.
+
+```python
+import sys
+import re
+sys.path.insert(0, "scripts")
+
+from pathlib import Path
+from kb_reader import (
+    KB_ROOT, get_file_body, parse_frontmatter,
+    find_section_by_topic, extract_tcode_section,
+    search_kb, TCODE_FILE, PROCESS_FILE,
+)
+
+
+# ── Query construction layer ───────────────────────────────────────────────────
+#
+# Converting unstructured failure descriptions into precise KB queries is the
+# core problem. The strategies below extract signal from three sources that
+# commonly appear in SAP failure reports:
+#   1. SAP message IDs  (M7 021, F5 class errors)
+#   2. Movement types   (three-digit numbers: 101, 201, 261, 411K)
+#   3. T-codes          (uppercase alphanums: MIGO, OBYC, OMWB)
+#   4. Transaction keys (3-char OBYC keys: BSX, WRX, GBB, KON, PRD)
+# Each signal maps to a KB query that fetches the most relevant section.
+
+
+# ── Known symptom patterns ─────────────────────────────────────────────────────
+# Maps extracted signal patterns to the KB section most likely to resolve them.
+# Values are (keyword_for_find_section_by_topic, description).
+
+_SYMPTOM_MAP: dict[str, tuple[str, str]] = {
+    # SAP message classes → symptom keyword
+    "F5":      ("Account Determination Error",   "F5 error: missing OBYC entry"),
+    "M7 021":  ("M7 021",                        "Deficit of GR quantity"),
+    "M7 090":  ("M7 090",                        "Accounting data not maintained"),
+    "M7 053":  ("Posting Period",                "Posting period not open"),
+    # Plain-language patterns → symptom keyword
+    "account determination error": ("Account Determination Error", "OBYC missing entry"),
+    "account not defined":         ("Account Determination Error", "OBYC missing entry"),
+    "no account found":            ("Account Determination Error", "OBYC missing entry"),
+    "wrong gl account":            ("Wrong GL Account",            "OBYC incorrect mapping"),
+    "wrong account":               ("Wrong GL Account",            "OBYC incorrect mapping"),
+    "posts to wrong":              ("Wrong GL Account",            "OBYC incorrect mapping"),
+    "accounting data not":         ("M7 090",                      "Material not extended"),
+    "not yet maintained":          ("M7 090",                      "Material not extended"),
+    "deficit of gr":               ("M7 021",                      "Insufficient GR stock"),
+    "posting period":              ("Posting Period",               "Period not open"),
+}
+
+# OBYC transaction key descriptions (used to enrich the diagnosis output)
+_TKEY_DESCRIPTIONS: dict[str, str] = {
+    "BSX": "Inventory balance sheet account (GR posts Dr BSX / Cr WRX)",
+    "WRX": "GR/IR clearing account (offset at GR; cleared by MIRO)",
+    "PRD": "Price difference — fires only for standard price (S) materials",
+    "GBB": "Consumption / COGS / scrapping offset (uses account modifier: VBR, VNG, VAX, VAY, VBO...)",
+    "KON": "Consignment payable — fires at vendor consignment withdrawal (411K)",
+    "AKO": "Consignment price difference — fires for S-price materials when consignment price ≠ standard",
+    "INV": "Inventory difference — fires at physical inventory posting (701/702)",
+    "UMB": "Price change / revaluation account — fires at MR21 / MR22",
+}
+
+# Movement type → OBYC transaction keys (from integration.md catalog)
+_MVTYPE_KEYS: dict[str, list[str]] = {
+    "101": ["BSX", "WRX", "PRD"],
+    "102": ["BSX", "WRX", "PRD"],   # reversal of 101
+    "122": ["BSX", "WRX", "PRD"],   # return to vendor
+    "201": ["GBB", "BSX"],          # GI to cost center (modifier VBR)
+    "261": ["GBB", "BSX"],          # GI to production order (modifier VBR)
+    "301": ["BSX"],                 # plant transfer
+    "311": [],                      # storage location transfer — NO FI posting
+    "541": [],                      # to subcontractor — NO FI posting
+    "543": ["GBB", "BSX"],          # auto-component consumption (modifier VBO)
+    "551": ["GBB", "BSX"],          # scrapping (modifier VNG)
+    "561": ["BSX", "GBB"],          # initial stock load (modifier BSA)
+    "601": ["GBB", "BSX"],          # GI for delivery (modifier VAX or VAY)
+    "411K": ["BSX", "KON", "AKO"],  # consignment withdrawal
+    "631": ["BSX"],                 # customer consignment fill-up (stock reclassification)
+    "633": ["GBB", "BSX"],          # customer consignment issue (modifier VAX/VAY)
+    "701": ["BSX", "GBB"],          # inventory surplus
+    "702": ["GBB", "BSX"],          # inventory shortage
+}
+
+
+def extract_failure_signals(description: str) -> dict:
+    """
+    Parse a free-text failure description and extract actionable signals for KB queries.
+
+    Extracts:
+        movement_types:  list[str]  — e.g. ["101", "261", "411K"]
+        transaction_keys: list[str] — e.g. ["BSX", "GBB"]
+        message_codes:   list[str]  — e.g. ["M7 021", "F5"]
+        tcodes:          list[str]  — e.g. ["MIGO", "OBYC"]
+        symptom_keyword: str|None   — best KB section keyword from _SYMPTOM_MAP
+        symptom_desc:    str|None   — human-readable symptom label
+
+    This function does NOT touch the KB — it only parses text.
+    """
+    lower = description.lower()
+    signals: dict = {
+        "movement_types":   [],
+        "transaction_keys": [],
+        "message_codes":    [],
+        "tcodes":           [],
+        "symptom_keyword":  None,
+        "symptom_desc":     None,
+    }
+
+    # Movement types: 3-digit numbers with optional letter suffix (411K, 201K, 631)
+    mv_matches = re.findall(r"\b([1-9]\d{2}[A-Z]?)\b", description)
+    signals["movement_types"] = list(dict.fromkeys(mv_matches))  # deduplicate, preserve order
+
+    # OBYC transaction keys: 2-3 uppercase letters that match known keys
+    known_keys = set(_TKEY_DESCRIPTIONS)
+    key_matches = re.findall(r"\b([A-Z]{2,3})\b", description)
+    signals["transaction_keys"] = [k for k in dict.fromkeys(key_matches) if k in known_keys]
+
+    # SAP message IDs: "M7 021", "M7 090", "M7 053", "F5"
+    msg_matches = re.findall(r"\b(M7\s*\d{3}|F5)\b", description, re.IGNORECASE)
+    signals["message_codes"] = [m.strip().upper() for m in dict.fromkeys(msg_matches)]
+
+    # T-codes: 2-10 uppercase alphanumeric tokens
+    tc_matches = re.findall(r"\b([A-Z][A-Z0-9]{1,9})\b", description)
+    known_tcodes = {"MIGO", "MIRO", "OBYC", "OMWB", "MM03", "MM02", "MB51",
+                    "ME21N", "MRBR", "OMJJ", "SE37", "ST05", "FS00", "MBEW"}
+    signals["tcodes"] = [t for t in dict.fromkeys(tc_matches) if t in known_tcodes]
+
+    # Symptom match: check patterns in order of specificity
+    for pattern, (kw, desc) in _SYMPTOM_MAP.items():
+        if pattern.lower() in lower:
+            signals["symptom_keyword"] = kw
+            signals["symptom_desc"]    = desc
+            break  # first match wins (patterns are ordered most-to-least specific)
+
+    # Infer symptom from message codes if not already found
+    if signals["symptom_keyword"] is None:
+        for code in signals["message_codes"]:
+            if code in _SYMPTOM_MAP:
+                signals["symptom_keyword"] = _SYMPTOM_MAP[code][0]
+                signals["symptom_desc"]    = _SYMPTOM_MAP[code][1]
+                break
+
+    return signals
+
+
+# ── KB query execution layer ────────────────────────────────────────────────────
+
+def _load_mm_sources() -> dict[str, tuple[str, str]]:
+    """Load the three MM files needed for account determination diagnosis."""
+    mm_advanced_path = KB_ROOT / "modules" / "mm" / "mm-advanced.md"
+    mm_integration_path = KB_ROOT / "modules" / "mm" / "integration.md"
+    fi_acct_det_path  = KB_ROOT / "modules" / "fi" / "account-determination.md"
+
+    sources = {}
+    for key, path in [
+        ("mm_advanced",    mm_advanced_path),
+        ("mm_integration", mm_integration_path),
+        ("fi_acct_det",    fi_acct_det_path),
+    ]:
+        if path.exists():
+            _, body = parse_frontmatter(path)
+            sources[key] = (body, str(path.relative_to(KB_ROOT)))
+        else:
+            sources[key] = ("", str(path))
+    return sources
+
+
+def query_kb_for_mm_acct_failure(signals: dict, sources: dict) -> dict:
+    """
+    Execute KB queries based on extracted signals and return raw query results.
+
+    Query strategy per signal type:
+      symptom_keyword  → find_section_by_topic(mm_advanced, keyword)      [exact section]
+      movement_types   → find_section_by_topic(mm_integration, "MT NNN")  [integration catalog]
+      transaction_keys → find_section_by_topic(fi_acct_det, key)          [FI framework]
+      "OBYC Debugging" → find_section_by_topic(mm_advanced, "Debugging")  [5-step procedure]
+      SPRO config      → find_section_by_topic(mm_advanced, "Valuation")  [config chain]
+      fallback         → search_kb(constructed query)                      [broad search]
+
+    Returns a dict of {query_name: (result_text, source_path)} for use by
+    the diagnosis builder. Values are (None, None) when not found.
+    """
+    mm_adv_body,  mm_adv_src  = sources["mm_advanced"]
+    mm_int_body,  mm_int_src  = sources["mm_integration"]
+    fi_acct_body, fi_acct_src = sources["fi_acct_det"]
+
+    results: dict[str, tuple[str | None, str | None]] = {}
+
+    # ── Query 1: Symptom section ──────────────────────────────────────────────
+    kw = signals["symptom_keyword"]
+    if kw:
+        section = find_section_by_topic(mm_adv_body, kw)
+        results["symptom"] = (section, mm_adv_src) if section else (None, None)
+    else:
+        results["symptom"] = (None, None)
+
+    # ── Query 2: OBYC 5-step debugging path ───────────────────────────────────
+    debug_section = find_section_by_topic(mm_adv_body, "OBYC Debugging Path")
+    if debug_section is None:
+        debug_section = find_section_by_topic(mm_adv_body, "Debugging Path")
+    results["debugging_path"] = (debug_section, mm_adv_src) if debug_section else (None, None)
+
+    # ── Query 3: Transaction key details from FI account determination ────────
+    tkey_results = {}
+    # Use keys from the failure description; if none named, infer from movement type
+    keys_to_look_up = list(signals["transaction_keys"])
+    for mv in signals["movement_types"]:
+        for k in _MVTYPE_KEYS.get(mv, []):
+            if k not in keys_to_look_up:
+                keys_to_look_up.append(k)
+
+    for key in keys_to_look_up[:4]:  # cap at 4 to avoid bloat
+        section = find_section_by_topic(fi_acct_body, key)
+        if section is None:
+            # Try mm_advanced for GBB modifier tables
+            section = find_section_by_topic(mm_adv_body, key)
+        tkey_results[key] = (section, fi_acct_src if section else None)
+    results["transaction_keys"] = tkey_results  # type: ignore[assignment]
+
+    # ── Query 4: Movement type → OBYC keys (integration catalog) ─────────────
+    mv_results = {}
+    for mv in signals["movement_types"][:3]:  # cap at 3
+        section = find_section_by_topic(mm_int_body, f"Movement Type {mv}")
+        if section is None:
+            section = find_section_by_topic(mm_int_body, mv)
+        mv_results[mv] = (section, mm_int_src) if section else (None, None)
+    results["movement_types"] = mv_results  # type: ignore[assignment]
+
+    # ── Query 5: Valuation class setup chain ──────────────────────────────────
+    valuation_chain = find_section_by_topic(mm_adv_body, "Valuation Class Setup Chain")
+    if valuation_chain is None:
+        valuation_chain = find_section_by_topic(mm_adv_body, "Valuation Class")
+    results["valuation_chain"] = (valuation_chain, mm_adv_src) if valuation_chain else (None, None)
+
+    # ── Query 6: Fallback — broad keyword search ──────────────────────────────
+    # Fires when symptom is unknown; searches all KB files for relevant content
+    if results["symptom"][0] is None:
+        # Build a targeted query from whatever signals were extracted
+        query_terms = []
+        if signals["transaction_keys"]:
+            query_terms.append(" ".join(signals["transaction_keys"][:2]))
+        if signals["movement_types"]:
+            query_terms.append(f"movement type {signals['movement_types'][0]}")
+        query_terms.append("account determination MM MIGO")
+        query = " ".join(query_terms)
+
+        hits, total = search_kb(query, max_results=5)
+        if hits:
+            fallback_text = "\n---\n".join(
+                f"[{h['source']}] {h['heading']}\n{h['excerpt']}" for h in hits
+            )
+            results["fallback_search"] = (
+                f"search_kb({repr(query)}) → {total}+ matches\n\n{fallback_text}",
+                "search_kb fallback",
+            )
+        else:
+            results["fallback_search"] = (None, None)
+    else:
+        results["fallback_search"] = (None, None)
+
+    return results
+
+
+# ── Diagnosis builder ────────────────────────────────────────────────────────
+
+def diagnose_mm_account_determination(
+    failure_description: str,
+    verbose: bool = False,
+) -> dict:
+    """
+    Diagnose a common MM account determination failure from a plain-language
+    description, returning a structured resolution guide.
+
+    Args:
+        failure_description: Free-text description of the failure, e.g.:
+            "MIGO GR posting fails with F5 error: account not defined for BSX"
+            "Movement type 201 goods issue posts to wrong GL account"
+            "Consignment withdrawal 411K account determination error KON"
+        verbose: If True, include full raw KB sections in the output.
+
+    Returns a dict containing:
+        signals        (dict)        — extracted failure signals
+        root_cause     (str|None)    — KB-sourced root cause description
+        resolution_steps (str|None)  — numbered steps from symptom KB section
+        debugging_path (str|None)    — 5-step OBYC debugging procedure
+        key_transactions (dict)      — T-code descriptions for diagnostic T-codes
+        transaction_key_info (dict)  — {key: (description, kb_detail)} for OBYC keys
+        movement_type_info (dict)    — {mv: (keys_expected, kb_detail)} for movement types
+        valuation_chain (str|None)   — how valuation class drives OBYC lookups
+        sources        (list[str])   — KB files consulted
+        fallback_used  (bool)        — True if search_kb fallback was needed
+    """
+    # Step 1: Parse the failure description into query signals
+    signals = extract_failure_signals(failure_description)
+
+    # Step 2: Load KB source files (once)
+    sources = _load_mm_sources()
+
+    # Step 3: Execute all KB queries
+    query_results = query_kb_for_mm_acct_failure(signals, sources)
+
+    # Step 4: Extract root cause and resolution from symptom section
+    root_cause        = None
+    resolution_steps  = None
+    symptom_text      = query_results["symptom"][0]
+    if symptom_text:
+        # Root cause line
+        cause_m = re.search(r"\*\*Root Cause:\*\*\s*(.+?)(?=\n\*\*|\Z)", symptom_text, re.DOTALL)
+        root_cause = cause_m.group(1).strip() if cause_m else None
+
+        # Numbered resolution steps
+        res_m = re.search(r"\*\*Resolution:\*\*\s*(.+?)(?=\n\*\*|\Z|---)", symptom_text, re.DOTALL)
+        resolution_steps = res_m.group(1).strip() if res_m else None
+
+    # Step 5: Map transaction keys to their descriptions + any KB detail found
+    tkey_info = {}
+    for key, (kb_detail, src) in query_results["transaction_keys"].items():  # type: ignore
+        tkey_info[key] = {
+            "description": _TKEY_DESCRIPTIONS.get(key, f"OBYC key {key}"),
+            "kb_detail":   kb_detail[:400] if (kb_detail and verbose) else None,
+            "source":      src,
+        }
+
+    # Step 6: Map movement types to expected keys + any KB detail found
+    mv_info = {}
+    for mv in signals["movement_types"]:
+        expected_keys = _MVTYPE_KEYS.get(mv, [])
+        kb_detail, src = query_results["movement_types"].get(mv, (None, None))  # type: ignore
+        mv_info[mv] = {
+            "expected_obyc_keys": expected_keys,
+            "no_fi_posting":      not bool(expected_keys),
+            "kb_detail":          kb_detail[:300] if (kb_detail and verbose) else None,
+            "source":             src,
+        }
+
+    # Step 7: Lookup T-code descriptions for OMWB, MM03, OBYC (the diagnostic tools)
+    mm_tcode_body, mm_tcode_src = get_file_body(TCODE_FILE, "MM")
+    diagnostic_tcodes = {}
+    for tcode in ["OMWB", "MM03", "MIGO"]:
+        section = extract_tcode_section(mm_tcode_body, tcode)
+        if section:
+            # Extract Usage line only (concise)
+            usage_m = re.search(r"\*\*Usage:\*\*\s*(.+?)(?=\n\*\*|\Z)", section)
+            diagnostic_tcodes[tcode] = usage_m.group(1).strip()[:200] if usage_m else section[:100]
+        else:
+            hits, _ = search_kb(f"{tcode} MM account determination simulation", max_results=1)
+            diagnostic_tcodes[tcode] = hits[0]["excerpt"][:150] if hits else f"{tcode} — not in KB"
+
+    # Step 8: Assemble final diagnosis
+    files_consulted = list({
+        src for src in [
+            query_results["symptom"][1],
+            query_results["debugging_path"][1],
+            query_results["valuation_chain"][1],
+        ] + [src for _, src in tkey_info.values()]
+        + [v.get("source") for v in mv_info.values()]
+        if src
+    })
+
+    return {
+        "signals":             signals,
+        "symptom_label":       signals["symptom_desc"] or "Unknown — search fallback used",
+        "root_cause":          root_cause,
+        "resolution_steps":    resolution_steps,
+        "debugging_path":      query_results["debugging_path"][0],
+        "transaction_key_info": tkey_info,
+        "movement_type_info":  mv_info,
+        "key_diagnostic_tcodes": diagnostic_tcodes,
+        "valuation_chain":     query_results["valuation_chain"][0],
+        "fallback_search":     query_results["fallback_search"][0],
+        "fallback_used":       query_results["fallback_search"][0] is not None,
+        "sources":             files_consulted,
+    }
+
+
+# ── Display helper ──────────────────────────────────────────────────────────
+
+def print_diagnosis(d: dict, max_chars: int = 500) -> None:
+    """Print a concise diagnosis report from the dict returned by diagnose_..."""
+    print(f"\n{'=' * 68}")
+    print(f"MM ACCOUNT DETERMINATION DIAGNOSIS")
+    print(f"Symptom: {d['symptom_label']}")
+    print("=" * 68)
+
+    signals = d["signals"]
+    print(f"\nExtracted signals:")
+    print(f"  Movement types:   {signals['movement_types'] or '(none detected)'}")
+    print(f"  Transaction keys: {signals['transaction_keys'] or '(none detected)'}")
+    print(f"  Message codes:    {signals['message_codes'] or '(none detected)'}")
+    print(f"  T-codes:          {signals['tcodes'] or '(none detected)'}")
+
+    if d["root_cause"]:
+        print(f"\nRoot cause (from KB):\n  {d['root_cause'][:250]}")
+
+    if d["transaction_key_info"]:
+        print(f"\nOBYC transaction keys involved:")
+        for key, info in d["transaction_key_info"].items():
+            src_tag = f"  ({info['source']})" if info["source"] else ""
+            print(f"  {key}: {info['description']}{src_tag}")
+
+    if d["movement_type_info"]:
+        print(f"\nMovement type analysis:")
+        for mv, info in d["movement_type_info"].items():
+            if info["no_fi_posting"]:
+                print(f"  {mv}: NO FI posting — stock reclassification only")
+            else:
+                print(f"  {mv}: fires keys {info['expected_obyc_keys']}")
+
+    if d["resolution_steps"]:
+        print(f"\nResolution steps (from KB — {d['sources'][0] if d['sources'] else 'KB'}):")
+        for line in d["resolution_steps"].splitlines()[:8]:
+            print(f"  {line}")
+
+    if d["debugging_path"]:
+        print(f"\nOBYC 5-step debugging path (truncated):")
+        for line in d["debugging_path"].splitlines()[:12]:
+            print(f"  {line}")
+
+    if d["fallback_used"]:
+        print(f"\n⚠  Fallback search used — no exact symptom match found.")
+        print(f"   Top search results:")
+        for line in (d["fallback_search"] or "").splitlines()[:6]:
+            print(f"   {line}")
+
+    print(f"\nKB files consulted: {', '.join(d['sources']) if d['sources'] else '(none)'}")
+
+
+# ── Four representative failure scenarios ─────────────────────────────────────
+
+# ── Scenario A: Classic F5 error — missing OBYC entry ────────────────────────
+print("=" * 68)
+print("SCENARIO A — Missing OBYC entry for BSX (GR fails with F5 error)")
+print("=" * 68)
+
+diagnosis_a = diagnose_mm_account_determination(
+    "MIGO posting fails: F5 error — account not defined for transaction key BSX. "
+    "Movement type 101 goods receipt against PO. Material valuation class 3010."
+)
+print_diagnosis(diagnosis_a)
+
+
+# ── Scenario B: Wrong GL account — silent posting error ───────────────────────
+print("\n\n" + "=" * 68)
+print("SCENARIO B — Wrong GL account on movement type 201 goods issue")
+print("=" * 68)
+
+diagnosis_b = diagnose_mm_account_determination(
+    "Movement type 201 goods issue to cost center posts to wrong GL account. "
+    "Expected consumption account 400100 but material posts to 140000 (inventory). "
+    "Suspect incorrect valuation class or GBB modifier VBR misconfigured."
+)
+print_diagnosis(diagnosis_b)
+
+
+# ── Scenario C: Consignment withdrawal — KON not configured ───────────────────
+print("\n\n" + "=" * 68)
+print("SCENARIO C — KON not configured for consignment withdrawal 411K")
+print("=" * 68)
+
+diagnosis_c = diagnose_mm_account_determination(
+    "Vendor consignment withdrawal movement type 411K fails with account determination error. "
+    "SAP error message references transaction key KON. Consignment info record exists."
+)
+print_diagnosis(diagnosis_c)
+
+
+# ── Scenario D: Unknown failure — fallback search path ────────────────────────
+print("\n\n" + "=" * 68)
+print("SCENARIO D — Unrecognized failure: fallback search path")
+print("=" * 68)
+
+diagnosis_d = diagnose_mm_account_determination(
+    "Material Ledger actual costing run CKMLCP fails during period-end. "
+    "Error relates to missing account for variance redistribution. "
+    "Plant has Material Ledger active with actual costing."
+)
+print_diagnosis(diagnosis_d)
+```
+
+**Expected output (Scenario A):**
+
+```
+====================================================================
+MM ACCOUNT DETERMINATION DIAGNOSIS
+Symptom: OBYC missing entry
+====================================================================
+
+Extracted signals:
+  Movement types:   ['101']
+  Transaction keys: ['BSX']
+  Message codes:    ['F5']
+  T-codes:          ['MIGO']
+
+Root cause (from KB):
+  Missing OBYC configuration for the valuation class + transaction key
+  combination for the material's chart of accounts and valuation grouping code.
+
+OBYC transaction keys involved:
+  BSX: Inventory balance sheet account (GR posts Dr BSX / Cr WRX)  (modules/fi/account-determination.md)
+  WRX: GR/IR clearing account (offset at GR; cleared by MIRO)
+  PRD: Price difference — fires only for standard price (S) materials
+
+Movement type analysis:
+  101: fires keys ['BSX', 'WRX', 'PRD']
+
+Resolution steps (from KB — modules/mm/mm-advanced.md):
+  1. Read the error message — it names the missing transaction key (BSX, GBB, WRX, etc.)
+  2. Check the material's valuation class: MM03 -> Accounting 1 view -> MBEW-BKLAS
+  3. Run OMWB simulation: enter the material number -> Simulation -> verify GL account...
+  4. Open OBYC: enter the transaction key from the error -> check if an entry exists...
+  5. For GBB errors: also check that the correct account modifier exists (VBR, VNG, etc.)
+
+OBYC 5-step debugging path (truncated):
+  ### 1e. OBYC Debugging Path
+  **Step 1: Identify the transaction key**
+  Read the error message — it usually names the transaction key...
+  **Step 2: Check OBYC configuration**
+  T-code OBYC -> Enter the transaction key -> Verify entry exists for:
+  ...
+
+KB files consulted: modules/mm/mm-advanced.md, modules/fi/account-determination.md
+```
+
+**Expected output (Scenario C — KON):**
+
+```
+Extracted signals:
+  Movement types:   ['411K']
+  Transaction keys: ['KON']
+  Message codes:    []
+  T-codes:          []
+
+Root cause (from KB):
+  Missing OBYC configuration for the valuation class + transaction key
+  combination...
+
+OBYC transaction keys involved:
+  KON: Consignment payable — fires at vendor consignment withdrawal (411K)
+       (modules/fi/account-determination.md)
+  AKO: Consignment price difference...
+  BSX: Inventory balance sheet account...
+
+Movement type analysis:
+  411K: fires keys ['BSX', 'KON', 'AKO']
+```
+
+**Expected output (Scenario D — fallback path):**
+
+```
+Extracted signals:
+  Movement types:   []
+  Transaction keys: []
+  Message codes:    []
+  T-codes:          ['CKMLCP']
+
+⚠  Fallback search used — no exact symptom match found.
+   Top search results:
+   [modules/mm/integration.md] CKMLCP — Material Ledger Actual Costing Run
+   Material Ledger must be active for the plant...
+```
+
+**The query construction pipeline:**
+
+```
+failure_description
+  │
+  ├─► extract_failure_signals()           ← regex parsing, no KB access
+  │     ├── movement types: [101, 411K]
+  │     ├── transaction keys: [BSX, KON]
+  │     ├── message codes: [F5, M7 021]
+  │     └── symptom_keyword: "Account Determination Error"
+  │
+  └─► query_kb_for_mm_acct_failure()      ← KB lookups, 6 strategies
+        ├── Q1: find_section_by_topic(mm_advanced, symptom_keyword)
+        │         → Symptom 1 or Symptom 6 section
+        ├── Q2: find_section_by_topic(mm_advanced, "OBYC Debugging Path")
+        │         → 5-step diagnostic procedure (Steps 1-5)
+        ├── Q3: find_section_by_topic(fi_acct_det, "BSX") × N keys
+        │         → transaction key framework entries
+        ├── Q4: find_section_by_topic(mm_integration, "Movement Type 101") × N mvtypes
+        │         → integration catalog rows (which keys fire, which tables updated)
+        ├── Q5: find_section_by_topic(mm_advanced, "Valuation Class Setup Chain")
+        │         → OMT0→OMSK→OBYC config chain
+        └── Q6: search_kb(constructed_query)    ← ONLY if Q1 returned None
+                  → broad fallback across all KB files
+```
+
+**Signals that map to specific queries — quick reference:**
+
+| Signal in failure description | Query constructed | KB source |
+|-------------------------------|-------------------|-----------|
+| "F5 error" / "account not defined" | `find_section_by_topic(mm_adv, "Account Determination Error")` | `mm-advanced.md` Symptom 1 |
+| "wrong GL account" / "posts to wrong" | `find_section_by_topic(mm_adv, "Wrong GL Account")` | `mm-advanced.md` Symptom 6 |
+| "M7 090" / "accounting data not maintained" | `find_section_by_topic(mm_adv, "M7 090")` | `mm-advanced.md` Symptom 5 |
+| "M7 021" / "deficit of GR" | `find_section_by_topic(mm_adv, "M7 021")` | `mm-advanced.md` Symptom 4 |
+| Movement type 101 | `_MVTYPE_KEYS["101"]` → [BSX, WRX, PRD]; lookup each in `fi/account-determination.md` | `fi/account-determination.md` |
+| Movement type 411K | `_MVTYPE_KEYS["411K"]` → [BSX, KON, AKO]; KON is the key to configure | `fi/account-determination.md` |
+| Movement type 541 | `_MVTYPE_KEYS["541"]` → [] (no FI posting) — diagnosis: expected, not a config error | `mm/integration.md` |
+| Any unrecognized failure | `search_kb("account determination MM MIGO ...")` | all KB files |
+
+---
+
+**MCP equivalent — identical diagnosis via server tools:**
+
+```python
+import asyncio
+from fastmcp import Client
+
+
+async def diagnose_via_mcp(failure_description: str):
+    """
+    Reproduce the same diagnostic chain using only MCP tool calls.
+    Use when the KB reader is not available (e.g., from an external client).
+    """
+    async with Client("scripts/mcp_server.py") as client:
+
+        # Q1: Symptom lookup — broad search first to find the right section
+        symptom_hits = await client.call_tool("search_by_keyword", {
+            "query": "account determination error MIGO GR missing OBYC"
+        })
+        print("=== Symptom search (top matches) ===")
+        print(symptom_hits.content[0].text[:800])
+
+        # Q2: OBYC debugging path — MM process flow has the 5-step diagnostic
+        debug_flow = await client.call_tool("get_process_flow", {
+            "module": "MM",
+            "process": "OBYC account determination debugging"
+        })
+        print("\n=== OBYC debugging path ===")
+        print(debug_flow.content[0].text[:1000])
+
+        # Q3: Transaction key BSX — look it up via the FI config path tool
+        bsx_config = await client.call_tool("get_config_path", {
+            "module": "FI",
+            "topic": "OBYC automatic postings BSX"
+        })
+        print("\n=== BSX transaction key (FI config) ===")
+        print(bsx_config.content[0].text[:600])
+
+        # Q4: Valuation class setup — MM config
+        val_class_config = await client.call_tool("get_config_path", {
+            "module": "MM",
+            "topic": "valuation class account determination"
+        })
+        print("\n=== Valuation class config chain (MM) ===")
+        print(val_class_config.content[0].text[:600])
+
+        # Q5: OMWB simulation T-code (key diagnostic tool)
+        omwb = await client.call_tool("lookup_tcode", {"tcode": "OMWB"})
+        print("\n=== OMWB T-code reference ===")
+        print(omwb.content[0].text[:400])
+
+        # Q6: For KON (consignment) — targeted search if needed
+        kon_search = await client.call_tool("search_by_keyword", {
+            "query": "KON consignment payable 411K account determination OBYC"
+        })
+        print("\n=== KON consignment key search ===")
+        print(kon_search.content[0].text[:600])
+
+
+asyncio.run(diagnose_via_mcp("MIGO 411K consignment withdrawal fails — KON not found"))
+```
+
+---
+
+## Key Files for MM Account Determination Diagnosis
+
+| File | Contents used |
+|------|--------------|
+| `modules/mm/mm-advanced.md` | **Primary** — OBYC debugging path (5 steps), Symptom 1 (missing entry), Symptom 6 (wrong GL account), movement type→key catalog (Section 1b), valuation class setup chain (Section 1c), 10+ worked posting examples |
+| `modules/fi/account-determination.md` | **Framework** — OBYC transaction key reference (BSX/WRX/GBB/PRD/KON/AKO detail), valuation grouping code concept, determination chain from movement type to GL account |
+| `modules/mm/integration.md` | **Catalog** — MM-FI integration point catalog (every movement type, which OBYC keys fire, which tables are updated); movement types 541/311 explicitly documented as NO FI posting |
+| `modules/mm/master-data.md` | **Field lookup** — MBEW-BKLAS (valuation class, Accounting 1 view), MBEW-VPRSV (price control S/V) — CORRECTION blocks flag commonly-wrong field locations |
+| `modules/mm/config-spro.md` | **Config paths** — OMJJ (movement type config), OMWM (valuation level), OMSK (account category reference), OMR6 (invoice tolerances) |
+
+---
+
+## Example 13: Confidence Levels and ECC 6 vs S/4HANA Handling
+
+Demonstrates how to read frontmatter confidence levels from KB files, filter responses by
+confidence tier, and branch behaviour when a topic has documented S/4HANA differences.
+
+### Part A — Fetch Confidence Levels for All KB Files
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from pathlib import Path
+from kb_reader import KB_ROOT, parse_frontmatter, _SEARCH_DIRS
+
+# --- Build confidence inventory across the whole KB ---
+def audit_confidence() -> list[dict]:
+    """
+    Return a list of {source, module, content_type, confidence, last_verified}
+    for every file in the KB search scope (modules/, cross-module/, reference/).
+    Files without frontmatter are tagged confidence='unknown'.
+    """
+    records = []
+    for _tag, rel_dir in _SEARCH_DIRS:
+        d = KB_ROOT / rel_dir
+        if not d.is_dir():
+            continue
+        for filepath in sorted(d.glob("*.md")):
+            meta, _ = parse_frontmatter(filepath)
+            records.append({
+                "source":        str(filepath.relative_to(KB_ROOT)),
+                "module":        meta.get("module", "—"),
+                "content_type":  meta.get("content_type", "—"),
+                "confidence":    meta.get("confidence", "unknown"),
+                "last_verified": meta.get("last_verified", "—"),
+            })
+    return records
+
+inventory = audit_confidence()
+
+# Print a confidence summary table
+print(f"{'Source':<45} {'Module':<8} {'Confidence':<10} {'Verified'}")
+print("-" * 80)
+for r in inventory:
+    print(f"{r['source']:<45} {r['module']:<8} {r['confidence']:<10} {r['last_verified']}")
+```
+
+**Expected output (excerpt):**
+```
+Source                                        Module   Confidence Verified
+--------------------------------------------------------------------------------
+modules/mm/tcodes.md                          mm       high       2026-02-16
+modules/mm/config-spro.md                     mm       high       2026-02-16
+modules/fi/account-determination.md           fi       medium     2026-02-16
+modules/co/processes.md                       co       medium     2026-02-17
+...
+```
+
+---
+
+### Part B — Gate Responses on Confidence Level
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from pathlib import Path
+from kb_reader import KB_ROOT, parse_frontmatter, get_file_body, normalize_module
+
+# Confidence tier hierarchy: high > medium > low > unknown
+_TIER = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+
+def fetch_with_confidence_check(
+    template: str,
+    module: str,
+    min_confidence: str = "medium",
+) -> tuple[str | None, dict]:
+    """
+    Read a KB file and return (body, meta).
+    Returns (None, meta) if the file's confidence is below min_confidence.
+
+    Callers should display a caveat when confidence < 'high' and refuse to
+    present content marked 'low' or 'unknown' as authoritative.
+    """
+    mod = normalize_module(module)
+    if not mod:
+        raise ValueError(f"Unknown module: {module!r}")
+
+    rel_path = template.format(module=mod.lower())
+    full_path = KB_ROOT / rel_path
+    meta, body = parse_frontmatter(full_path)
+
+    file_tier  = _TIER.get(meta.get("confidence", "unknown"), 0)
+    min_tier   = _TIER.get(min_confidence, 0)
+
+    if file_tier < min_tier:
+        return None, meta   # caller must handle the gap
+
+    return body, meta
+
+
+# --- Usage example: FI account-determination (confidence: medium) ---
+body, meta = fetch_with_confidence_check(
+    "modules/{module}/account-determination.md",
+    module="FI",
+    min_confidence="medium",
+)
+
+if body is None:
+    conf = meta.get("confidence", "unknown")
+    print(f"[WARN] Confidence '{conf}' is below the required threshold. "
+          "Verify content before using in a client deliverable.")
+else:
+    conf = meta.get("confidence", "unknown")
+    if conf != "high":
+        print(f"[NOTE] Confidence level: {conf!r} — treat as reference, not authoritative.\n")
+    print(body[:1200])
+
+
+# --- Attempt to load a hypothetical low-confidence file ---
+# Simulate what happens when confidence is below the gate
+class _FakePath:
+    """Stand-in to illustrate low-confidence handling without a real low file."""
+
+    def read_text(self, **_):
+        return "---\nmodule: sd\ncontent_type: hypothetical\nconfidence: low\n---\nSome speculative content."
+
+import kb_reader as _kb
+_orig = _kb.KB_ROOT
+
+# Patch to demonstrate the gate
+from pathlib import PurePosixPath
+from unittest.mock import patch, MagicMock
+
+low_meta = {"module": "sd", "content_type": "hypothetical", "confidence": "low"}
+low_body = "Some speculative content."
+
+# Directly call the gate logic for demonstration
+file_tier = _TIER.get(low_meta.get("confidence", "unknown"), 0)
+min_tier  = _TIER.get("medium", 0)
+if file_tier < min_tier:
+    print("\n[BLOCKED] Low-confidence content was requested but is below the 'medium' gate.")
+    print(f"  File confidence : {low_meta['confidence']!r}")
+    print(f"  Min required    : 'medium'")
+    print("  Action          : surface a caveat or refuse to cite.")
+```
+
+---
+
+### Part C — ECC 6.0 vs S/4HANA Branching
+
+The KB's disambiguation table (`.claude/rules/sap-disambiguation.md`) lists areas where
+ECC 6.0 and S/4HANA behave differently.  Use `extract_disambiguation_rows` to check
+whether a topic has a documented S/4HANA difference, then branch the response accordingly.
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from kb_reader import (
+    KB_ROOT, parse_frontmatter, extract_disambiguation_rows,
+    DISAMBIGUATION_FILE,
+)
+
+def check_s4_difference(topic: str) -> str | None:
+    """
+    Return the disambiguation table rows for *topic* if an ECC 6 vs S/4HANA
+    difference exists, or None if the topic is identical across both versions.
+
+    Callers should display the returned rows as a warning/caveat when the user
+    is on S/4HANA, or suppress them when the session is confirmed ECC 6.0-only.
+    """
+    disam_path = KB_ROOT / DISAMBIGUATION_FILE
+    _, body = parse_frontmatter(disam_path)
+    return extract_disambiguation_rows(body, topic)
+
+
+# ── Scenario 1: Topic with a known S/4HANA difference ───────────────────────
+topic = "vendor master"
+rows = check_s4_difference(topic)
+
+if rows:
+    print(f"⚠  '{topic}' has ECC 6 vs S/4HANA differences:")
+    print(rows)
+    print("\n→ This KB covers ECC 6.0.  If the user is on S/4HANA, flag that")
+    print("  XK01/FK01/LFA1 are replaced by Business Partner (BP / BUT000).")
+else:
+    print(f"✓  '{topic}' — no documented S/4HANA difference.  ECC 6 guidance applies directly.")
+
+
+# ── Scenario 2: Topic with NO S/4HANA difference ────────────────────────────
+topic_clean = "GR/IR clearing"
+rows_clean = check_s4_difference(topic_clean)
+
+if rows_clean:
+    print(f"\n⚠  '{topic_clean}' has S/4HANA differences:\n{rows_clean}")
+else:
+    print(f"\n✓  '{topic_clean}' — no documented S/4HANA difference.  Safe to present ECC 6 answer.")
+
+
+# ── Scenario 3: Build a full response with integrated confidence + S/4 check ─
+def safe_answer(module_template: str, module: str, s4_topic: str) -> None:
+    """
+    Load a KB file, check its confidence, and warn on S/4HANA differences.
+    Prints a response suitable for inclusion in a client-facing document.
+    """
+    from kb_reader import normalize_module, get_file_body
+
+    mod = normalize_module(module)
+    if not mod:
+        print(f"Module '{module}' not recognised.")
+        return
+
+    rel = module_template.format(module=mod.lower())
+    full = KB_ROOT / rel
+    meta, body = parse_frontmatter(full)
+
+    conf  = meta.get("confidence", "unknown")
+    ecc   = meta.get("ecc_version", "6.0")
+    verified = meta.get("last_verified", "unknown")
+
+    # 1. Confidence gate
+    tier_map = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+    if tier_map.get(conf, 0) < tier_map["medium"]:
+        print(f"[BLOCKED] {rel}: confidence='{conf}' — not safe to present.")
+        return
+
+    # 2. Header with provenance
+    caveat = "" if conf == "high" else f"  (confidence: {conf} — verify before client use)"
+    print(f"=== {rel} | ECC {ecc} | verified {verified}{caveat} ===\n")
+    print(body[:800])
+
+    # 3. S/4HANA difference warning
+    disam = check_s4_difference(s4_topic)
+    if disam:
+        print(f"\n─── S/4HANA DIFFERENCE ({s4_topic}) ───")
+        print(disam)
+        print("─── This KB is ECC 6.0 only.  Confirm system version before applying. ───")
+
+
+safe_answer(
+    module_template="modules/{module}/master-data.md",
+    module="MM",
+    s4_topic="Material documents",
+)
+```
+
+**Output structure:**
+```
+=== modules/mm/master-data.md | ECC 6.0 | verified 2026-02-16 ===
+
+# Materials Management — Master Data
+...
+[first 800 chars of body]
+
+─── S/4HANA DIFFERENCE (Material documents) ───
+| Area             | ECC 6 (This KB)          | S/4HANA (Not Covered)    |
+|---|---|---|
+| Material documents | MKPF/MSEG tables       | MATDOC single table      |
+─── This KB is ECC 6.0 only.  Confirm system version before applying. ───
+```
+
+---
+
+### Part D — MCP Equivalent
+
+The same confidence and S/4HANA checks are available via the MCP `compare_ecc_s4` tool.
+Use this from an external client when `kb_reader.py` is not importable.
+
+```python
+import asyncio
+from fastmcp import Client
+
+
+async def mcp_confidence_and_s4_check(topic: str) -> None:
+    """
+    Via MCP: search for a topic, then check for S/4HANA differences.
+    Confidence metadata is embedded in the search results' source paths —
+    callers should surface it alongside the content.
+    """
+    async with Client("scripts/mcp_server.py") as client:
+
+        # Step 1: Keyword search — results include 'source' (file path with module)
+        hits = await client.call_tool("search_by_keyword", {"query": topic})
+        raw = hits.content[0].text
+        print(f"=== Search results for '{topic}' ===")
+        print(raw[:600])
+
+        # Step 2: ECC 6 vs S/4HANA disambiguation — returns None / table rows
+        diff = await client.call_tool("compare_ecc_s4", {"topic": topic})
+        diff_text = diff.content[0].text.strip()
+
+        if diff_text and "no match" not in diff_text.lower():
+            print(f"\n⚠  S/4HANA difference found for '{topic}':")
+            print(diff_text)
+            print("\n→ This KB is ECC 6.0 only.  Flag the difference to the user.")
+        else:
+            print(f"\n✓  No S/4HANA difference documented for '{topic}'.")
+            print("   ECC 6.0 answer applies directly.")
+
+
+asyncio.run(mcp_confidence_and_s4_check("vendor master"))
+asyncio.run(mcp_confidence_and_s4_check("GR/IR clearing"))
+```
+
+---
+
+## Key Design Decisions for Confidence and S/4HANA Handling
+
+| Decision | Rationale |
+|----------|-----------|
+| `confidence` read from frontmatter via `parse_frontmatter()` | Every KB file declares its own confidence level — no separate registry |
+| Gate at `"medium"` by default | `low` and `unknown` files exist only as stubs; `high` is safe for client-facing use |
+| `extract_disambiguation_rows()` scoped to `.claude/rules/sap-disambiguation.md` | Single authoritative source for ECC/S/4 differences; no duplication |
+| `compare_ecc_s4` MCP tool wraps the same logic | Consistent behaviour across direct and MCP access paths |
+| ECC 6.0 is always the primary reference; S/4HANA rows are disambiguation-only | Matches KB scope (ECC 6.0 only); prevents accidental S/4 guidance in ECC context |
+
+---
+
+## Example 14: Query Routing — Module Detection, Intent Classification, and Tool Prioritization
+
+A router that analyses free-text user input, identifies which SAP module(s) and query
+intent are present, and dispatches to the optimal combination of KB tools in priority order.
+Handles single-module, cross-module, and ambiguous queries.
+
+### Routing Architecture
+
+```
+user query
+    │
+    ├─ detect_modules()     → {MM, SD, FI, CO}  (set, may be empty)
+    ├─ classify_intent()    → tcode | config | process | overview | s4_compare | keyword
+    │
+    └─ build_plan()         → ordered list of (tool_fn, kwargs) steps
+           │
+           └─ execute_plan() → results list, with fallback on miss
+```
+
+### Part A — Module Detector and Intent Classifier
+
+```python
+import re
+from dataclasses import dataclass, field
+
+# ── Module detection ──────────────────────────────────────────────────────────
+
+# Explicit abbreviation patterns (word-boundary aware)
+_MODULE_PATTERNS: dict[str, list[str]] = {
+    "MM": [r"\bMM\b", r"\bprocure", r"\bpurchas", r"\binvoice verif",
+           r"\bgoods receipt", r"\bgoods issue", r"\bMIGO\b", r"\bMIRO\b",
+           r"\bME\d{2}", r"\bMB\d{2}", r"\bvendor master", r"\binventory"],
+    "SD": [r"\bSD\b", r"\bsales order", r"\bdelivery\b", r"\bbilling\b",
+           r"\bVF\d{2}", r"\bVA\d{2}", r"\bVL\d{2}", r"\bpricing\b",
+           r"\bcustomer master", r"\border.to.cash", r"\bO2C\b"],
+    "FI": [r"\bFI\b", r"\bgeneral ledger\b", r"\bGL\b", r"\baccounts payable\b",
+           r"\bAP\b", r"\baccounts receivable\b", r"\bAR\b", r"\bFB\d{2}",
+           r"\bF110\b", r"\bF\.13\b", r"\bOB\d{2}", r"\bpayment run",
+           r"\bdepreciation\b", r"\basset accounting\b", r"\bOBYC\b"],
+    "CO": [r"\bCO\b", r"\bcost center\b", r"\binternal order\b",
+           r"\bprofit center\b", r"\bsettlement\b", r"\ballocation\b",
+           r"\bassessment\b", r"\bKO\d{2}", r"\bKS\d{2}", r"\bKSU\d",
+           r"\bCK\d{2}", r"\bproduct cost", r"\bcontrolling\b"],
+}
+
+def detect_modules(query: str) -> set[str]:
+    """
+    Return the set of SAP modules (MM/SD/FI/CO) mentioned or implied by *query*.
+    Matches abbreviations, full names, common T-code prefixes, and domain keywords.
+    Returns an empty set when no module signal is found (triggers cross-module search).
+    """
+    q = query.lower()
+    found: set[str] = set()
+    for module, patterns in _MODULE_PATTERNS.items():
+        for pat in patterns:
+            if re.search(pat, query, re.IGNORECASE):
+                found.add(module)
+                break
+    return found
+
+
+# ── Intent classifier ─────────────────────────────────────────────────────────
+
+# A T-code is 2–6 uppercase letters optionally followed by digits (ME21N, FB50, MIGO…)
+_TCODE_RE = re.compile(r"\b([A-Z]{1,4}[0-9]{1,3}[A-Z]?|[A-Z]{2,6})\b")
+
+_INTENT_SIGNALS: dict[str, list[str]] = {
+    "tcode":      [r"\bt-?code\b", r"\btransaction\b", r"\bwhat does .+ do\b",
+                   r"\bwhat is .{2,8}\b"],
+    "config":     [r"\bconfigur", r"\bSPRO\b", r"\bIMG\b", r"\bsetting\b",
+                   r"\bset up\b", r"\bactivat", r"\bdefine\b", r"\bcustomiz",
+                   r"\btolerance key", r"\bnumber range", r"\bdocument type"],
+    "process":    [r"\bhow (does|do|to)\b", r"\bstep", r"\bprocess\b",
+                   r"\bflow\b", r"\bsequence\b", r"\bcycle\b", r"\bprocedure",
+                   r"\bwalkthrough\b", r"\bend.to.end\b", r"\bE2E\b",
+                   r"\bP2P\b", r"\bO2C\b", r"\bR2R\b"],
+    "overview":   [r"\bwhat (files|content|topics|does .+ cover)",
+                   r"\boverview\b", r"\bindex\b", r"\bwhat is in\b",
+                   r"\bcover\b", r"\borientation\b"],
+    "s4_compare": [r"\bS/4\b", r"\bS4HANA\b", r"\bdifferen", r"\bcompar",
+                   r"\bECC vs\b", r"\bvs S/4\b", r"\bmigrat"],
+    "keyword":    [],   # fallback — always matches last
+}
+
+def classify_intent(query: str) -> str:
+    """
+    Return the dominant query intent:
+      'tcode'     – asking about a specific transaction code
+      'config'    – asking for SPRO/IMG configuration steps
+      'process'   – asking for a step-by-step business process
+      'overview'  – asking what the KB covers for a module
+      's4_compare'– asking about ECC 6 vs S/4HANA differences
+      'keyword'   – open-ended fallback
+
+    Priority order: tcode > s4_compare > config > process > overview > keyword.
+    A bare T-code token (ME21N, FB50…) in the query boosts 'tcode' intent.
+    """
+    # Boost: raw T-code token present in query → high confidence tcode intent
+    tokens = re.findall(r"\b[A-Z][A-Z0-9]{1,5}\b", query)
+    known_tcodes = {t for t in tokens if re.match(r"[A-Z]{1,4}\d{1,3}[A-Z]?$", t)}
+    if known_tcodes:
+        return "tcode"
+
+    for intent, patterns in _INTENT_SIGNALS.items():
+        if intent == "keyword":
+            continue
+        for pat in patterns:
+            if re.search(pat, query, re.IGNORECASE):
+                return intent
+
+    return "keyword"
+
+
+# ── Quick smoke-test ──────────────────────────────────────────────────────────
+_test_queries = [
+    ("What does ME21N do?",                              {"MM"},   "tcode"),
+    ("How do I configure tolerance keys in MM?",         {"MM"},   "config"),
+    ("Walk me through the P2P process",                  {"MM"},   "process"),
+    ("What files does the FI module cover?",             {"FI"},   "overview"),
+    ("How does vendor master differ in S/4HANA?",        {"MM"},   "s4_compare"),
+    ("Explain GR/IR clearing",                           set(),    "keyword"),
+    ("How does GR in MM post to FI?",                    {"MM","FI"}, "process"),
+    ("FB50 vs F-02 — which should I use?",               {"FI"},   "tcode"),
+]
+
+print(f"{'Query':<50} {'Modules':<12} {'Intent'}")
+print("-" * 78)
+for q, exp_mod, exp_int in _test_queries:
+    mods = detect_modules(q)
+    intent = classify_intent(q)
+    mod_ok  = "✓" if mods == exp_mod  else f"✗(got {mods})"
+    int_ok  = "✓" if intent == exp_int else f"✗(got {intent})"
+    print(f"{q:<50} {mod_ok:<12} {int_ok}")
+```
+
+---
+
+### Part B — Plan Builder: Module × Intent → Tool Priority List
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from kb_reader import (
+    normalize_module, get_file_body, extract_tcode_section,
+    find_section_by_topic, extract_disambiguation_rows,
+    parse_frontmatter, search_kb,
+    KB_ROOT, TCODE_FILE, CONFIG_FILE, PROCESS_FILE,
+    OVERVIEW_FILE, DISAMBIGUATION_FILE,
+)
+
+# Re-use detect_modules / classify_intent from Part A
+
+@dataclass
+class RouteStep:
+    """One tool call in the execution plan."""
+    tool:    str            # human name for logging
+    fn:      object         # callable
+    kwargs:  dict = field(default_factory=dict)
+    label:   str = ""       # display label for result block
+
+@dataclass
+class RoutePlan:
+    steps:    list[RouteStep]
+    modules:  set[str]
+    intent:   str
+    tcode:    str | None = None   # extracted T-code if present
+
+
+def _extract_tcode_from_query(query: str) -> str | None:
+    """Pull the first plausible T-code token out of *query*."""
+    for tok in re.findall(r"\b([A-Z][A-Z0-9]{1,5})\b", query):
+        if re.match(r"[A-Z]{1,4}\d{1,3}[A-Z]?$", tok):
+            return tok
+    # Also match purely alpha codes known to be T-codes (MIGO, MIRO, FBRA…)
+    alpha = re.findall(r"\b([A-Z]{3,6})\b", query)
+    for tok in alpha:
+        if tok in {"MIGO", "MIRO", "MMPV", "FBRA", "FBZP", "AFAB", "AJAB",
+                   "AJRW", "CKMLCP", "OMWB", "OBYC", "VKOA", "NACE",
+                   "KALC", "OKEON", "OKKP", "OB52", "OBB8"}:
+            return tok
+    return None
+
+
+def _tcode_steps(query: str, modules: set[str]) -> list[RouteStep]:
+    """
+    T-code intent: try the detected module(s) first, then fan out to all four.
+    This avoids searching every module when the user already named MM or FI.
+    """
+    tcode = _extract_tcode_from_query(query)
+    if not tcode:
+        # No recognisable T-code — fall back to keyword search
+        return [RouteStep("search_kb", search_kb,
+                          {"query": query}, "Keyword fallback")]
+
+    ordered = list(modules) + [m for m in ["MM", "SD", "FI", "CO"]
+                                if m not in modules]
+    steps = []
+    for mod in ordered:
+        body, source = get_file_body(TCODE_FILE, mod)
+        steps.append(RouteStep(
+            tool=f"lookup_tcode({tcode}) in {mod}",
+            fn=lambda b=body, t=tcode, s=source: (
+                extract_tcode_section(b, t) and
+                f"{extract_tcode_section(b, t)}\n\nSource: {s}"
+            ),
+            label=f"T-code {tcode} — {mod}",
+        ))
+    return steps
+
+
+def _config_steps(query: str, modules: set[str]) -> list[RouteStep]:
+    """
+    Config intent: route to get_config_path for each detected module.
+    Extract a topic substring from the query to pass as the search key.
+
+    Topic extraction: strip common config trigger words and use the remainder.
+    """
+    # Strip trigger words to isolate the config topic
+    topic = re.sub(
+        r"\b(how (do I|to)|configure|configuration|SPRO|IMG|setting|"
+        r"set up|what is the|path for|steps for|activate)\b",
+        "", query, flags=re.IGNORECASE,
+    ).strip(" ?.")
+
+    target_modules = modules if modules else {"MM", "SD", "FI", "CO"}
+    # Prioritise by KB routing table heuristic: FI for OBYC/VKOA, MM for MIGO/MIRO
+    if any(kw in query.upper() for kw in ("OBYC", "VKOA", "ACCOUNT DETERMINATION")):
+        target_modules = ({"FI"} | modules)
+    if any(kw in query.upper() for kw in ("TOLERANCE", "OMR6", "THREE-WAY")):
+        target_modules = ({"MM"} | modules)
+
+    steps = []
+    for mod in target_modules:
+        body, source = get_file_body(CONFIG_FILE, mod)
+        steps.append(RouteStep(
+            tool=f"get_config_path({mod}, {topic!r})",
+            fn=lambda b=body, t=topic, s=source: (
+                (find_section_by_topic(b, t) or "") and
+                f"{find_section_by_topic(b, t)}\n\nSource: {s}"
+            ),
+            label=f"SPRO config — {mod}: {topic}",
+        ))
+    # Keyword fallback for config queries the section matcher misses
+    steps.append(RouteStep("search_kb fallback", search_kb,
+                           {"query": topic or query}, "Config keyword fallback"))
+    return steps
+
+
+def _process_steps(query: str, modules: set[str]) -> list[RouteStep]:
+    """
+    Process intent: route to get_process_flow for each detected module.
+    Cross-module queries (e.g., 'how does GR in MM post to FI') fan out to both.
+    """
+    # Extract process label
+    process = re.sub(
+        r"\b(how does|how do|walk me through|explain|describe|"
+        r"what (are|is) the steps (for|to))\b",
+        "", query, flags=re.IGNORECASE,
+    ).strip(" ?.")
+
+    target_modules = modules if modules else {"MM", "SD", "FI", "CO"}
+    steps = []
+    for mod in target_modules:
+        body, source = get_file_body(PROCESS_FILE, mod)
+        steps.append(RouteStep(
+            tool=f"get_process_flow({mod}, {process!r})",
+            fn=lambda b=body, p=process, s=source: (
+                (find_section_by_topic(b, p) or "") and
+                f"{find_section_by_topic(b, p)}\n\nSource: {s}"
+            ),
+            label=f"Process — {mod}: {process}",
+        ))
+    # Cross-module supplement: always add a keyword search for integration queries
+    if len(target_modules) > 1:
+        steps.append(RouteStep("cross-module search", search_kb,
+                               {"query": process or query},
+                               "Cross-module keyword supplement"))
+    return steps
+
+
+def _overview_steps(query: str, modules: set[str]) -> list[RouteStep]:
+    target_modules = modules if modules else {"MM", "SD", "FI", "CO"}
+    return [
+        RouteStep(
+            tool=f"get_module_overview({mod})",
+            fn=lambda m=mod: (
+                lambda body, source: f"{body.strip()}\n\nSource: {source}"
+            )(*get_file_body(OVERVIEW_FILE, m)),
+            label=f"Overview — {mod}",
+        )
+        for mod in target_modules
+    ]
+
+
+def _s4_steps(query: str, modules: set[str]) -> list[RouteStep]:
+    # Extract the topic for compare_ecc_s4
+    topic = re.sub(
+        r"\b(how (does|do)|differ|difference|compare|ECC vs|vs S/4|in S/4HANA|"
+        r"migrat\w+|S/4HANA|S4HANA)\b",
+        "", query, flags=re.IGNORECASE,
+    ).strip(" ?.")
+    _, body = parse_frontmatter(KB_ROOT / DISAMBIGUATION_FILE)
+    return [RouteStep(
+        tool=f"compare_ecc_s4({topic!r})",
+        fn=lambda b=body, t=topic: (
+            extract_disambiguation_rows(b, t) or
+            f"No ECC vs S/4HANA comparison found for '{t}'."
+        ),
+        label=f"ECC 6 vs S/4HANA: {topic}",
+    )]
+
+
+def build_plan(query: str) -> RoutePlan:
+    """
+    Analyse *query* and return a RoutePlan with steps ordered by priority.
+
+    Priority rules per intent:
+      tcode      — detected modules first, then MM→SD→FI→CO fan-out
+      config     — detected modules first; SPRO match before keyword fallback
+      process    — detected modules; cross-module keyword supplement when >1 module
+      overview   — detected modules (all four when none detected)
+      s4_compare — single disambiguation lookup + keyword supplement
+      keyword    — direct search_kb call (broadest net)
+    """
+    modules = detect_modules(query)
+    intent  = classify_intent(query)
+    tcode   = _extract_tcode_from_query(query) if intent == "tcode" else None
+
+    if intent == "tcode":
+        steps = _tcode_steps(query, modules)
+    elif intent == "config":
+        steps = _config_steps(query, modules)
+    elif intent == "process":
+        steps = _process_steps(query, modules)
+    elif intent == "overview":
+        steps = _overview_steps(query, modules)
+    elif intent == "s4_compare":
+        steps = _s4_steps(query, modules)
+        steps.append(RouteStep("search_kb supplement", search_kb,
+                               {"query": query}, "S/4 keyword supplement"))
+    else:  # keyword
+        steps = [RouteStep("search_kb", search_kb,
+                           {"query": query}, "Keyword search")]
+
+    return RoutePlan(steps=steps, modules=modules, intent=intent, tcode=tcode)
+```
+
+---
+
+### Part C — Plan Executor with Early-Exit and Fallback
+
+```python
+def execute_plan(plan: RoutePlan, stop_on_first_hit: bool = True) -> list[dict]:
+    """
+    Execute each RouteStep in order.
+
+    stop_on_first_hit=True (default): halt after the first step that returns
+    non-empty content.  Used for T-code lookups where the first module hit is
+    authoritative.
+
+    stop_on_first_hit=False: collect results from ALL steps (used for process
+    and config queries that benefit from multi-module coverage).
+
+    Returns a list of {label, result, hit} dicts.
+    """
+    collected = []
+    for step in plan.steps:
+        try:
+            result = step.fn(**step.kwargs) if step.kwargs else step.fn()
+        except Exception as exc:
+            result = f"[ERROR] {step.tool}: {exc}"
+
+        hit = bool(result and "not found" not in result.lower()
+                   and "[error]" not in result.lower()
+                   and "no match" not in result.lower()
+                   and "no results" not in result.lower())
+
+        collected.append({"label": step.label, "result": result or "", "hit": hit})
+
+        if stop_on_first_hit and hit:
+            break
+
+    # If every step missed, surface the last keyword-fallback result
+    if not any(r["hit"] for r in collected):
+        fallback_results, _ = search_kb(plan.steps[0].kwargs.get("query", ""))
+        if fallback_results:
+            collected.append({
+                "label": "Keyword fallback (auto)",
+                "result": "\n\n---\n\n".join(
+                    f"{r['heading']}\n{r['excerpt']}\nSource: {r['source']}"
+                    for r in fallback_results[:3]
+                ),
+                "hit": True,
+            })
+
+    return collected
+
+
+def route_query(query: str, stop_on_first_hit: bool | None = None) -> None:
+    """
+    Full pipeline: detect → classify → plan → execute → print results.
+
+    stop_on_first_hit defaults: True for tcode/overview, False for all others.
+    """
+    plan = build_plan(query)
+
+    if stop_on_first_hit is None:
+        stop_on_first_hit = plan.intent in ("tcode", "overview")
+
+    print(f"\n{'='*70}")
+    print(f"Query  : {query}")
+    print(f"Modules: {plan.modules or '(none detected — cross-module)'}")
+    print(f"Intent : {plan.intent}" +
+          (f"  →  T-code: {plan.tcode}" if plan.tcode else ""))
+    print(f"Steps  : {len(plan.steps)} planned  |  early-exit={stop_on_first_hit}")
+    print("="*70)
+
+    results = execute_plan(plan, stop_on_first_hit=stop_on_first_hit)
+    executed = len(results)
+    hits = sum(1 for r in results if r["hit"])
+
+    for i, r in enumerate(results, 1):
+        status = "HIT" if r["hit"] else "miss"
+        print(f"\n[{i}/{executed}] {status.upper()} — {r['label']}")
+        if r["hit"]:
+            print(r["result"][:600])
+        else:
+            print("  (no content returned)")
+
+    print(f"\n─ Executed {executed}/{len(plan.steps)} steps, {hits} hit(s) ─")
+```
+
+---
+
+### Part D — End-to-End Test Suite
+
+```python
+# Each tuple: (query, expected_intent, expected_modules_subset)
+_routing_tests = [
+    # T-code queries — should hit on first module match
+    ("What does ME21N do?",
+     "tcode", {"MM"}),
+
+    ("Explain FB50 transaction",
+     "tcode", {"FI"}),
+
+    ("How do I use MIGO for goods receipt?",
+     "tcode", {"MM"}),
+
+    # Config queries — may hit multiple modules
+    ("How do I configure tolerance keys in MM?",
+     "config", {"MM"}),
+
+    ("What is the SPRO path for payment terms in FI?",
+     "config", {"FI"}),
+
+    ("Configure OBYC account determination",
+     "config", {"FI"}),                # FI boosted by OBYC keyword
+
+    # Process queries — fan out where cross-module
+    ("Walk me through the Procure-to-Pay process",
+     "process", {"MM"}),
+
+    ("How does a goods receipt in MM create FI documents?",
+     "process", {"MM", "FI"}),         # cross-module → both modules
+
+    ("Explain the CO period-end close sequence",
+     "process", {"CO"}),
+
+    # Overview queries
+    ("What does the FI module cover?",
+     "overview", {"FI"}),
+
+    # S/4HANA comparison queries
+    ("How does vendor master differ in S/4HANA?",
+     "s4_compare", {"MM"}),
+
+    # Keyword fallback — no module, no intent signals
+    ("What is GR/IR clearing?",
+     "keyword", set()),
+]
+
+print("\n" + "─"*70)
+print("ROUTING TEST SUITE")
+print("─"*70)
+
+for query, exp_intent, exp_modules_subset in _routing_tests:
+    plan = build_plan(query)
+    int_ok = "✓" if plan.intent == exp_intent else f"✗ got={plan.intent}"
+    mod_ok = "✓" if exp_modules_subset.issubset(plan.modules) else f"✗ got={plan.modules}"
+    print(f"{query[:55]:<56} intent={int_ok}  modules={mod_ok}")
+
+print("\n─"*35)
+print("LIVE EXECUTION — T-code lookup (ME21N):")
+route_query("What does ME21N do?")
+
+print("\nLIVE EXECUTION — Config query (FI payment terms):")
+route_query("What is the SPRO path for payment terms in FI?", stop_on_first_hit=False)
+
+print("\nLIVE EXECUTION — Cross-module process (GR → FI):")
+route_query("How does a goods receipt in MM post to FI?", stop_on_first_hit=False)
+
+print("\nLIVE EXECUTION — Keyword fallback:")
+route_query("What is GR/IR clearing?")
+```
+
+---
+
+### Part E — MCP Async Router
+
+```python
+import asyncio
+from fastmcp import Client
+
+
+async def mcp_route_query(query: str) -> None:
+    """
+    MCP-based query router.  Reuses detect_modules / classify_intent from Part A
+    and dispatches to the correct MCP tool(s), building the same priority ordering
+    as the direct-Python router.
+    """
+    modules = detect_modules(query)
+    intent  = classify_intent(query)
+    tcode   = _extract_tcode_from_query(query) if intent == "tcode" else None
+
+    async with Client("scripts/mcp_server.py") as client:
+
+        if intent == "tcode" and tcode:
+            # Fan out — stop on first hit
+            print(f"[tcode] Looking up {tcode} (modules priority: {modules or 'all'})")
+            result = await client.call_tool("lookup_tcode", {"tcode": tcode})
+            print(result.content[0].text[:800])
+
+        elif intent == "config":
+            topic = re.sub(
+                r"\b(how (do I|to)|configure|SPRO|IMG|setting|set up)\b",
+                "", query, flags=re.IGNORECASE).strip(" ?.")
+            target = list(modules) if modules else ["MM", "SD", "FI", "CO"]
+            for mod in target[:2]:   # cap at 2 modules for MCP to stay concise
+                print(f"\n[config] {mod} → {topic!r}")
+                r = await client.call_tool("get_config_path",
+                                           {"module": mod, "topic": topic})
+                txt = r.content[0].text
+                if "no exact match" not in txt.lower():
+                    print(txt[:700])
+                    break
+                print("  (no match — trying next module)")
+            else:
+                # All modules missed — fall back to keyword search
+                print("[config] Fallback to keyword search")
+                r = await client.call_tool("search_by_keyword", {"query": topic})
+                print(r.content[0].text[:600])
+
+        elif intent == "process":
+            process = re.sub(
+                r"\b(how does|walk me through|explain|describe)\b",
+                "", query, flags=re.IGNORECASE).strip(" ?.")
+            target = list(modules) if modules else ["MM"]
+            for mod in target:
+                print(f"\n[process] {mod} → {process!r}")
+                r = await client.call_tool("get_process_flow",
+                                           {"module": mod, "process": process})
+                print(r.content[0].text[:700])
+            if len(target) > 1:
+                # Cross-module: supplement with keyword search
+                print("\n[process] Cross-module keyword supplement")
+                r = await client.call_tool("search_by_keyword", {"query": process})
+                print(r.content[0].text[:400])
+
+        elif intent == "overview":
+            target = list(modules) if modules else ["MM", "SD", "FI", "CO"]
+            for mod in target:
+                print(f"\n[overview] {mod}")
+                r = await client.call_tool("get_module_overview", {"module": mod})
+                print(r.content[0].text[:500])
+
+        elif intent == "s4_compare":
+            topic = re.sub(
+                r"\b(differ|compare|ECC vs|in S/4HANA|S4HANA)\b",
+                "", query, flags=re.IGNORECASE).strip(" ?.")
+            print(f"[s4_compare] {topic!r}")
+            r = await client.call_tool("compare_ecc_s4", {"topic": topic})
+            print(r.content[0].text)
+
+        else:  # keyword fallback
+            print(f"[keyword] {query!r}")
+            r = await client.call_tool("search_by_keyword", {"query": query})
+            print(r.content[0].text[:700])
+
+
+# asyncio.run(mcp_route_query("What does ME21N do?"))
+# asyncio.run(mcp_route_query("How do I configure tolerance keys in MM?"))
+# asyncio.run(mcp_route_query("How does a goods receipt in MM post to FI?"))
+# asyncio.run(mcp_route_query("How does vendor master differ in S/4HANA?"))
+# asyncio.run(mcp_route_query("What is GR/IR clearing?"))
+```
+
+---
+
+## Routing Decision Reference
+
+| Intent | Detection signals | Primary tool(s) | Priority order | Early-exit? |
+|--------|-------------------|-----------------|----------------|-------------|
+| `tcode` | T-code token in query, "transaction", "t-code" | `lookup_tcode` | Detected modules → MM→SD→FI→CO | Yes |
+| `config` | "configure", "SPRO", "IMG", "setting", "activate" | `get_config_path` | Detected modules; OBYC→FI boost, tolerance→MM boost | No — collect all hits |
+| `process` | "how does", "steps", "flow", "sequence", "P2P/O2C/R2R" | `get_process_flow` | Detected modules; keyword supplement when >1 | No |
+| `overview` | "cover", "index", "what is in", "orientation" | `get_module_overview` | Detected modules (all 4 if none) | Yes |
+| `s4_compare` | "S/4", "differ", "compare", "ECC vs" | `compare_ecc_s4` | Single lookup + keyword supplement | Yes |
+| `keyword` | Fallback | `search_kb` | Single call | N/A |
+
+**Fallback chain** (any intent): if all steps return empty → `search_kb(original_query)`
+
+---
+
+## Example 15: Fallback Strategy for Out-of-Scope Queries
+
+Implements a layered fallback handler that intercepts queries outside the KB's strict
+ECC 6.0 / MM-SD-FI-CO scope, integrates with project-level `CLAUDE.md` overrides, and
+degrades gracefully instead of returning empty or misleading answers.
+
+### Fallback Tiers
+
+```
+Query
+  │
+  ├─ Tier 0: CLAUDE.md project override?  → honour project-specific instruction
+  ├─ Tier 1: Fully in scope?              → normal router (Example 14)
+  ├─ Tier 2: S/4HANA-specific?            → compare_ecc_s4 if ECC context survives;
+  │                                         otherwise explicit out-of-scope notice
+  ├─ Tier 3: Unsupported module?          → report gap + nearest covered module
+  ├─ Tier 4: In-scope module but no hit?  → broad search_kb + module CLAUDE.md hint
+  └─ Tier 5: Complete miss               → structured graceful-degradation message
+```
+
+### Part A — Scope Checker
+
+```python
+import re
+from dataclasses import dataclass, field
+from typing import Literal
+
+# ── Supported scope ────────────────────────────────────────────────────────────
+
+_SUPPORTED_MODULES = {"MM", "SD", "FI", "CO"}
+
+# Modules explicitly NOT in the KB — used to name the gap precisely
+_UNSUPPORTED_MODULE_PATTERNS: dict[str, str] = {
+    "PM":  r"\bPM\b|\bplant maintenance\b|\bequipment master\b|\bnotification\b",
+    "QM":  r"\bQM\b|\bquality management\b|\binspection lot\b|\bQA\d{2}\b",
+    "PP":  r"\bPP\b|\bproduction (order|planning)\b|\bBOM\b|\brouting\b|\bCA\d{2}\b",
+    "WM":  r"\bWM\b|\bwarehouse management\b|\btransfer order\b|\bLT\d{2}\b",
+    "PS":  r"\bPS\b|\bproject system\b|\bWBS element\b|\bCJ\d{2}\b|\bnetwork\b",
+    "HR":  r"\bHR\b|\bhuman resources\b|\bpayroll\b|\bPA\d{2}\b|\binfotype\b",
+    "BASIS": r"\bBASIS\b|\bSM\d{2}\b|\bST\d{2}\b|\btransport\b|\bSAP\s+Basis\b",
+    "ABAP": r"\bABAP\b|\bSE\d{2}\b|\buser exit\b|\bBAdI\b|\bBAP[iI]\b|\bALV\b",
+}
+
+# S/4HANA-specific signals that indicate the user wants S/4 *primary* guidance
+_S4_PRIMARY_SIGNALS = [
+    r"\bS/4HANA\s+only\b",
+    r"\bFiori\s+app\b",
+    r"\bUniversal\s+Journal\b",
+    r"\bACDOCA\b",
+    r"\bembedded\s+analytics\b",
+    r"\bCDS\s+view\b",
+    r"\bBTP\b",
+    r"\bSAP\s+Cloud\b",
+    r"\bin\s+S/4\b(?!\s*(?:HANA)?\s*differ)",  # "in S/4" without "differ"
+]
+
+# ECC versions outside ECC 6.0 Enhancement Packs 0-8
+_ECC_VERSION_SIGNALS = [
+    r"\bECC\s*[0-4]\b",
+    r"\bR/3\b",
+    r"\bECC\s*7\b",
+    r"\bECC\s*9\b",
+]
+
+OutOfScopeReason = Literal[
+    "s4hana_primary",      # user wants S/4HANA guidance, not ECC 6
+    "unsupported_module",  # PM, QM, PP, WM, PS, HR, ABAP, BASIS
+    "wrong_ecc_version",   # R/3, ECC 4.x, etc.
+    "no_content",          # in-scope module but KB returned nothing
+    "in_scope",            # fully supported
+]
+
+
+@dataclass
+class ScopeResult:
+    reason:          OutOfScopeReason
+    unsupported_mod: str | None = None
+    s4_signals:      list[str] = field(default_factory=list)
+
+
+def check_scope(query: str) -> ScopeResult:
+    """
+    Classify whether *query* is in scope for the ECC 6.0 KB.
+
+    Priority: wrong_ecc_version > s4hana_primary > unsupported_module > in_scope.
+    """
+    for pat in _ECC_VERSION_SIGNALS:
+        if re.search(pat, query, re.IGNORECASE):
+            return ScopeResult("wrong_ecc_version")
+
+    matched_s4 = [p for p in _S4_PRIMARY_SIGNALS
+                  if re.search(p, query, re.IGNORECASE)]
+    if matched_s4:
+        return ScopeResult("s4hana_primary", s4_signals=matched_s4)
+
+    for mod, pat in _UNSUPPORTED_MODULE_PATTERNS.items():
+        if re.search(pat, query, re.IGNORECASE):
+            return ScopeResult("unsupported_module", unsupported_mod=mod)
+
+    return ScopeResult("in_scope")
+
+
+# Smoke-test
+_scope_tests = [
+    ("What does ME21N do?",                                  "in_scope"),
+    ("How do I use Fiori apps for purchase orders?",         "s4hana_primary"),
+    ("How does ACDOCA replace the classic GL?",              "s4hana_primary"),
+    ("How do I create a production order in PP?",            "unsupported_module"),
+    ("What is the T-code for WM transfer orders?",           "unsupported_module"),
+    ("How do I configure tolerances in R/3?",                "wrong_ecc_version"),
+    ("What T-codes exist in ECC 4.6?",                       "wrong_ecc_version"),
+    ("How does vendor master differ in S/4HANA?",            "in_scope"),  # comparison, not primary
+]
+
+print(f"{'Query':<55} {'Expected':<20} {'Got'}")
+print("-"*85)
+for q, exp in _scope_tests:
+    got = check_scope(q).reason
+    ok  = "✓" if got == exp else "✗"
+    print(f"{ok}  {q:<54} {exp:<20} {got}")
+```
+
+---
+
+### Part B — CLAUDE.md Project-Override Reader
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from pathlib import Path
+from kb_reader import KB_ROOT, parse_frontmatter
+
+_CLAUDE_MD_PATHS = [
+    KB_ROOT / ".claude" / "CLAUDE.md",   # KB behaviour rules
+    KB_ROOT / "CLAUDE.md",               # KB top-level scope statement
+]
+
+
+@dataclass
+class ProjectOverride:
+    scope_statement:   str
+    out_of_scope_note: str
+    s4_disambiguation: str
+    see_also_hint:     str
+
+
+_SCOPE_DEFAULTS = ProjectOverride(
+    scope_statement  = "This KB covers SAP ECC 6.0 (Enhancement Packs 0–8).",
+    out_of_scope_note = (
+        "Modules PM, QM, PP (deep), WM, PS, HR, ABAP, and BASIS are not covered. "
+        "S/4HANA is covered only for ECC-vs-S/4 disambiguation."
+    ),
+    s4_disambiguation = (
+        "S/4HANA mentions are for disambiguation only — this KB covers ECC 6.0. "
+        "Do not mix ECC 6 and S/4HANA behaviour unless explicitly comparing them."
+    ),
+    see_also_hint = (
+        "Start with .claude/rules/sap-routing.md to find the right module, "
+        "then read the module CLAUDE.md for file orientation."
+    ),
+)
+
+
+def read_project_overrides() -> ProjectOverride:
+    """
+    Parse CLAUDE.md files and extract fallback-relevant instructions.
+    Reads the KB's own CLAUDE.md files; a project may place its own
+    CLAUDE.md at KB_ROOT to add project-specific overrides.
+    Falls back to _SCOPE_DEFAULTS when files are absent or unparseable.
+    """
+    combined = ""
+    for p in _CLAUDE_MD_PATHS:
+        if p.exists():
+            _, body = parse_frontmatter(p)
+            combined += body + "\n"
+
+    if not combined.strip():
+        return _SCOPE_DEFAULTS
+
+    scope_match = re.search(r"[^.\n]*ECC 6[^.\n]*\.", combined)
+    scope_stmt  = scope_match.group(0).strip() if scope_match else _SCOPE_DEFAULTS.scope_statement
+
+    s4_match = re.search(r"[^.\n]*S/4HANA[^.\n]*disambiguation[^.\n]*\.", combined)
+    s4_rule  = s4_match.group(0).strip() if s4_match else _SCOPE_DEFAULTS.s4_disambiguation
+
+    routing_match = re.search(r"[^.\n]*sap-routing\.md[^.\n]*\.", combined)
+    see_also = routing_match.group(0).strip() if routing_match else _SCOPE_DEFAULTS.see_also_hint
+
+    return ProjectOverride(
+        scope_statement   = scope_stmt,
+        out_of_scope_note = _SCOPE_DEFAULTS.out_of_scope_note,
+        s4_disambiguation = s4_rule,
+        see_also_hint     = see_also,
+    )
+```
+
+---
+
+### Part C — Graceful-Degradation Message Builder
+
+```python
+# Maps unsupported module → (nearest covered module, rationale)
+_NEAREST_COVERED: dict[str, tuple[str | None, str]] = {
+    "PP": ("MM", "MM covers goods movements and inventory that overlap with production "
+                 "logistics. For full PP (BOM, routings, production orders), consult "
+                 "dedicated PP documentation."),
+    "WM": ("MM", "MM covers inventory management at the storage-location level (MARD). "
+                 "Warehouse Management (bin/transfer-order level) is not in this KB."),
+    "QM": ("MM", "MM covers goods receipt and inspection stock (MARD-INSME). "
+                 "Full quality inspection lots (QM) are not covered."),
+    "PM": ("MM", "MM covers equipment-relevant goods movements. Plant Maintenance "
+                 "order processing and notification management are not covered."),
+    "PS": ("CO", "CO covers internal orders and WBS settlement at a high level. "
+                 "Full Project System (CJ-series T-codes, network scheduling) is not covered."),
+    "HR": ("FI",  "FI covers payroll FI postings (PC00_MXX result). "
+                  "HR infotypes, payroll schemas, and time management are not covered."),
+    "BASIS": (None, "SAP Basis administration (SM-series, transport management, security) "
+                    "is outside this KB's scope entirely."),
+    "ABAP":  (None, "ABAP development, SE-series T-codes, BAdIs, and user exits "
+                    "are outside this KB's scope entirely."),
+}
+
+
+def build_fallback_message(
+    query: str,
+    scope: ScopeResult,
+    override: ProjectOverride,
+    partial_hits: list[dict] | None = None,
+) -> str:
+    """
+    Build a structured, actionable fallback message.
+    partial_hits — search_kb results to surface as partial context even when
+                   the query is out of scope.
+    """
+    lines: list[str] = []
+
+    if scope.reason == "s4hana_primary":
+        lines.append(
+            "⚠  This question requires S/4HANA-specific guidance.\n"
+            f"   {override.scope_statement}\n"
+            f"   {override.s4_disambiguation}\n\n"
+            "   To compare ECC 6 and S/4HANA for this area, use:\n"
+            "     → compare_ecc_s4(topic='<area>')\n"
+            "   For S/4HANA primary documentation, consult SAP Help Portal "
+            "(help.sap.com) or the S/4HANA Best Practices documentation."
+        )
+
+    elif scope.reason == "unsupported_module":
+        mod = scope.unsupported_mod
+        nearest_mod, nearest_hint = _NEAREST_COVERED.get(mod, (None, ""))
+        lines.append(
+            f"⚠  Module {mod} is not covered in this KB.\n"
+            f"   {override.scope_statement}\n"
+            f"   {override.out_of_scope_note}"
+        )
+        if nearest_mod:
+            lines.append(f"\n   Closest covered module: {nearest_mod}\n   {nearest_hint}")
+        else:
+            lines.append(f"\n   {nearest_hint}")
+
+    elif scope.reason == "wrong_ecc_version":
+        lines.append(
+            "⚠  This KB covers ECC 6.0 (Enhancement Packs 0–8) only.\n"
+            "   Questions about R/3, ECC 4.x, or versions outside ECC 6.0 EHP 0–8\n"
+            "   are outside scope.  Consult SAP OSS notes or the relevant\n"
+            "   release-specific documentation for that version."
+        )
+
+    elif scope.reason == "no_content":
+        lines.append(
+            f"ℹ  No content found for this query in the ECC 6.0 KB.\n"
+            f"   {override.see_also_hint}"
+        )
+
+    if partial_hits:
+        lines.append("\n─── Related content (partial context) ───")
+        for hit in partial_hits[:2]:
+            lines.append(f"\n{hit['heading']}\n{hit['excerpt']}\nSource: {hit['source']}")
+
+    lines.append(f"\n─── Routing guidance ───\n{override.see_also_hint}")
+    return "\n".join(lines)
+```
+
+---
+
+### Part D — Full Fallback Router
+
+```python
+from kb_reader import (
+    get_file_body, search_kb, OVERVIEW_FILE, normalize_module,
+    parse_frontmatter, extract_disambiguation_rows, DISAMBIGUATION_FILE,
+)
+
+# detect_modules / classify_intent / build_plan / execute_plan from Example 14
+
+
+def fallback_route(query: str, verbose: bool = True) -> str:
+    """
+    Five-tier fallback pipeline.
+
+    Tier 0: CLAUDE.md override rules loaded first (always).
+    Tier 1: In-scope + router hit  → normal answer.
+    Tier 2: S/4HANA primary        → compare_ecc_s4 + scope notice.
+    Tier 3: Unsupported module /
+            wrong ECC version      → gap notice + nearest module + partial hits.
+    Tier 4: In-scope, router miss  → broad search_kb + module CLAUDE.md hint.
+    Tier 5: Complete miss          → structured graceful-degradation message.
+    """
+    # Tier 0 — load project CLAUDE.md instructions
+    override = read_project_overrides()
+    scope    = check_scope(query)
+
+    # Tier 2: S/4HANA primary
+    if scope.reason == "s4hana_primary":
+        topic = re.sub(
+            r"\b(in S/4|S/4HANA|Fiori|ACDOCA|Universal Journal|how does|explain)\b",
+            "", query, flags=re.IGNORECASE).strip(" ?.")
+        _, dis_body = parse_frontmatter(KB_ROOT / DISAMBIGUATION_FILE)
+        rows = extract_disambiguation_rows(dis_body, topic)
+        partial = ([{"heading": f"ECC 6 vs S/4HANA — {topic}",
+                     "excerpt": rows, "source": DISAMBIGUATION_FILE}]
+                   if rows else None)
+        msg = build_fallback_message(query, scope, override, partial_hits=partial)
+        if verbose:
+            print(f"[Tier 2 — S/4HANA fallback]\n{msg}")
+        return msg
+
+    # Tier 3: unsupported module
+    if scope.reason == "unsupported_module":
+        partial_results, _ = search_kb(query, max_results=3)
+        msg = build_fallback_message(query, scope, override,
+                                     partial_hits=partial_results or None)
+        if verbose:
+            print(f"[Tier 3 — unsupported module: {scope.unsupported_mod}]\n{msg}")
+        return msg
+
+    # Tier 3: wrong ECC version
+    if scope.reason == "wrong_ecc_version":
+        msg = build_fallback_message(query, scope, override)
+        if verbose:
+            print(f"[Tier 3 — wrong ECC version]\n{msg}")
+        return msg
+
+    # Tier 1: in scope — run normal router (Example 14 build_plan / execute_plan)
+    plan    = build_plan(query)
+    results = execute_plan(plan, stop_on_first_hit=(plan.intent in ("tcode", "overview")))
+    hits    = [r for r in results if r["hit"]]
+
+    if hits:
+        answer = hits[0]["result"]
+        if verbose:
+            print(f"[Tier 1 — in-scope hit]  intent={plan.intent}  modules={plan.modules}")
+            print(answer[:700])
+        return answer
+
+    # Tier 4: in scope but no direct hit — broad keyword fallback + CLAUDE.md hint
+    broad_results, total = search_kb(query, max_results=5)
+    if broad_results:
+        parts = [f"ℹ  No direct match. Broader search returned {total}+ result(s):\n"]
+        for r in broad_results[:3]:
+            parts.append(f"[{r['source']}] {r['heading']}\n{r['excerpt']}")
+        for mod in (plan.modules or set()):
+            mod_norm = normalize_module(mod)
+            if mod_norm:
+                overview_body, overview_src = get_file_body(OVERVIEW_FILE, mod_norm)
+                parts.append(
+                    f"\n── {mod_norm} module orientation ({overview_src}) ──\n"
+                    + overview_body[:400]
+                )
+        answer = "\n\n".join(parts)
+        if verbose:
+            print(f"[Tier 4 — broad fallback]\n{answer[:700]}")
+        return answer
+
+    # Tier 5: complete miss
+    msg = build_fallback_message(query, ScopeResult("no_content"), override)
+    if verbose:
+        print(f"[Tier 5 — complete miss]\n{msg}")
+    return msg
+```
+
+---
+
+### Part E — MCP Async Fallback Handler
+
+```python
+import asyncio
+from fastmcp import Client
+
+
+async def mcp_fallback_route(query: str) -> None:
+    """
+    MCP-based fallback router — same tier logic dispatched via MCP tool calls.
+    """
+    override = read_project_overrides()
+    scope    = check_scope(query)
+
+    async with Client("scripts/mcp_server.py") as client:
+
+        # Tier 2: S/4HANA primary
+        if scope.reason == "s4hana_primary":
+            topic = re.sub(
+                r"\b(in S/4|S/4HANA|Fiori|ACDOCA|Universal Journal)\b",
+                "", query, flags=re.IGNORECASE).strip(" ?.")
+            print(f"[Tier 2] compare_ecc_s4({topic!r})")
+            r   = await client.call_tool("compare_ecc_s4", {"topic": topic})
+            txt = r.content[0].text
+            if "no comparison" not in txt.lower():
+                print(txt[:700])
+                print(f"\n⚠  {override.s4_disambiguation}")
+            else:
+                print(build_fallback_message(query, scope, override))
+            return
+
+        # Tier 3: unsupported module
+        if scope.reason == "unsupported_module":
+            print(f"[Tier 3] Unsupported: {scope.unsupported_mod}")
+            r        = await client.call_tool("search_by_keyword", {"query": query})
+            txt      = r.content[0].text
+            has_hits = "no results" not in txt.lower()
+            partial  = ([{"heading": "Keyword (partial context)",
+                           "excerpt": txt[:400], "source": "search_by_keyword"}]
+                        if has_hits else None)
+            print(build_fallback_message(query, scope, override, partial_hits=partial))
+            return
+
+        # Tier 3: wrong ECC version
+        if scope.reason == "wrong_ecc_version":
+            print("[Tier 3] Wrong ECC version")
+            print(build_fallback_message(query, scope, override))
+            return
+
+        # Tier 1+4: in scope — try search_by_keyword as proxy for normal routing
+        print(f"[Tier 1/4] In-scope — routing query")
+        r   = await client.call_tool("search_by_keyword", {"query": query})
+        txt = r.content[0].text
+
+        if txt and "no results" not in txt.lower():
+            print(f"[Tier 1] Hit\n{txt[:700]}")
+        else:
+            print("[Tier 4/5] No hit — graceful degradation")
+            print(build_fallback_message(query, ScopeResult("no_content"), override))
+
+
+# asyncio.run(mcp_fallback_route("How do I use Fiori apps for purchase orders?"))
+# asyncio.run(mcp_fallback_route("How do I create a production order in PP?"))
+# asyncio.run(mcp_fallback_route("How do I configure tolerances in R/3?"))
+# asyncio.run(mcp_fallback_route("What does ME21N do?"))
+# asyncio.run(mcp_fallback_route("xyzzy frob quantum banana"))
+```
+
+---
+
+## Fallback Tier Summary
+
+| Tier | Trigger | Action | CLAUDE.md role |
+|------|---------|--------|----------------|
+| 0 | Always | Load project override instructions | Source of all scope/rule text |
+| 1 | In-scope, router hit | Return normal answer | Module orientation on miss |
+| 2 | S/4HANA primary query | `compare_ecc_s4` + out-of-scope notice | Provides `s4_disambiguation` rule |
+| 3a | Unsupported module (PP/WM…) | Gap notice + nearest covered module + partial keyword hits | Provides `scope_statement` |
+| 3b | Wrong ECC version (R/3…) | Version boundary notice | Provides `scope_statement` |
+| 4 | In-scope, router miss | Broad `search_kb` + module CLAUDE.md orientation hint | Provides `see_also_hint` |
+| 5 | Complete miss | Structured graceful-degradation message | Provides full scope statement |
+
+**Key principle:** every tier returns *something actionable* — partial content, a redirect,
+or an explicit scope statement.  Empty responses are never returned.
+The CLAUDE.md files are the single source of truth for scope boundaries and
+disambiguation rules; `read_project_overrides()` ensures those rules are always
+loaded before any routing decision is made.
