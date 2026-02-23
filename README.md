@@ -60,6 +60,14 @@ Claude will automatically route SAP questions to the right content. No extra com
 
 ---
 
+## MCP Server (Claude Code + Claude Desktop)
+
+The knowledge base also works as an MCP server — Claude can query it directly as a tool, rather than reading markdown files. This enables lower-context usage and works in Claude Desktop as well as Claude Code.
+
+See [SETUP.md](SETUP.md) for step-by-step setup instructions (Python required; 10–15 minutes; no coding needed).
+
+---
+
 ## What's Covered
 
 | Module | Key Topics |
