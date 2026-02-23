@@ -66,6 +66,70 @@ The knowledge base also works as an MCP server — Claude can query it directly 
 
 See [SETUP.md](SETUP.md) for step-by-step setup instructions (Python required; 10–15 minutes; no coding needed).
 
+**Available MCP tools:**
+
+| Tool | What it does |
+|---|---|
+| `lookup_tcode` | Full entry for a known T-code (menu path, usage, gotchas) |
+| `get_module_overview` | File index and key concepts for a module |
+| `get_config_path` | SPRO/IMG configuration path for a topic |
+| `get_process_flow` | Step-by-step business process flow |
+| `compare_ecc_s4` | ECC 6 vs S/4HANA differences for a topic |
+| `search_by_keyword` | Full-text search across all KB files |
+
+---
+
+## Programmatic API
+
+The KB ships with a Python library (`scripts/kb_reader.py`) for direct programmatic access — useful for building tools, running batch queries, or integrating the KB into an application.
+
+```python
+import sys
+sys.path.insert(0, "scripts")
+
+from kb_reader import (
+    KB_ROOT,             # Path: repo root
+    get_file_body,       # load any KB file body by module + template name
+    parse_frontmatter,   # read YAML frontmatter + body from a file
+    find_section_by_topic,   # locate a section by heading keyword
+    extract_tcode_section,   # pull a complete T-code entry
+    search_kb,           # full-text keyword search across all files
+)
+
+# Example: get the SPRO path for OBYC in MM
+body, source = get_file_body("config-spro", "MM")
+section = find_section_by_topic(body, "OBYC")
+print(section)
+```
+
+See [EXAMPLES.md](EXAMPLES.md) for 17 runnable examples covering common integration patterns.
+
+---
+
+## Code Examples
+
+[EXAMPLES.md](EXAMPLES.md) contains 17 runnable Python examples demonstrating how to query the KB programmatically and via MCP:
+
+| Example | What it demonstrates |
+|---|---|
+| 1 | Fetch the complete Order-to-Cash process flow |
+| 2 | Look up a transaction code |
+| 3 | Get SPRO configuration steps by topic |
+| 4 | Extract all SD-FI integration points programmatically |
+| 5 | MCP tool calls via `fastmcp` client |
+| 6 | FI account determination — OBYC transaction key lookup |
+| 7 | FI account determination troubleshooting — chained SPRO lookups |
+| 8 | MCP tool calls for FI account determination |
+| 9 | CO month-end close — extract and look up all required T-codes |
+| 10 | Internal order settlement — query and validate process flow |
+| 11 | Design patterns with SPRO configuration paths |
+| 12 | MM account determination failure — query construction and diagnosis |
+| 13 | Confidence levels and ECC 6 vs S/4HANA handling |
+| 14 | Query routing — module detection, intent classification, tool prioritization |
+| 15 | Fallback strategy for out-of-scope queries |
+| 16 | T-code discovery by functional description |
+| 17 | FI SPRO account determination — KB structure, helper contracts, full error handling |
+
 ---
 
 ## What's Covered
