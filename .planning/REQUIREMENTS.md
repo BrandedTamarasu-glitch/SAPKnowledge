@@ -29,7 +29,7 @@ Requirements for v1.1 MCP Server release. Each maps to roadmap phases.
 
 ### Deployment
 
-- [ ] **MCP-11**: Setup documentation enables a non-developer to configure the MCP server in Claude Code and Claude Desktop
+- [x] **MCP-11**: Setup documentation enables a non-developer to configure the MCP server in Claude Code and Claude Desktop
 
 ## v1 Requirements
 
@@ -153,7 +153,7 @@ Requirements for initial release (v1.0 — all shipped).
 | MCP-08 | Phase 14 | Complete |
 | MCP-09 | Phase 13 | Complete |
 | MCP-10 | Phase 13 | Complete |
-| MCP-11 | Phase 15 | Pending |
+| MCP-11 | Phase 15 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 11 total

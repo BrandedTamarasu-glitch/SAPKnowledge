@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** When someone asks Claude "how do I do X in SAP," it gives the correct ECC 6 answer — right transaction, right config path, right module interactions.
-**Current focus:** v1.1 milestone — MCP Server. Phase 14 complete (search_by_keyword tool added). Next: Phase 15 (deployment documentation).
+**Current focus:** v1.1 milestone complete — MCP Server + deployment docs shipped. All 11 MCP requirements (MCP-01 through MCP-11) fulfilled.
 
 ## Current Position
 
-Phase: 14
-Plan: 14-01 (complete)
-Status: Phase 14 complete — search_by_keyword MCP tool delivered; mcp_server.py now has 6 tools (5 P1 + 1 P2); MCP-08 requirement fulfilled.
-Last activity: 2026-02-23 — Phase 14 Plan 01 executed (search_kb() + search_by_keyword())
+Phase: 15
+Plan: 15-01 (complete)
+Status: Phase 15 complete — SETUP.md non-developer setup guide delivered; README.md updated with MCP Server link; MCP-11 requirement fulfilled. v1.1 milestone complete.
+Last activity: 2026-02-23 — Phase 15 Plan 01 executed (SETUP.md + README.md MCP link)
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
-(40 known plans have SUMMARY.md; Phase 15 pending)
+(41 known plans have SUMMARY.md; all phases complete)
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Progress: [██████████] 99%
 | Phase 12 P02 | 15 | 2 tasks | 2 files |
 | Phase 13-mcp-server P01 | 2 | 2 tasks | 3 files |
 | Phase 14-keyword-search-tool P01 | 2 | 2 tasks | 2 files |
+| Phase 15-deployment-documentation P01 | 13 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -150,10 +151,12 @@ Recent decisions affecting current work:
 - [Phase 13-02]: _tool_manager internal API not present in FastMCP 3.0.2 — tool verification uses import + functional smoke tests instead
 - [Phase 14-keyword-search-tool]: search_kb() returns tuple (list[dict], int) — both values used by mcp_server to show truncation note when total > cap
 - [Phase 14-keyword-search-tool]: [Phase 14-01]: search_by_keyword tool docstring follows MCP-09 pattern with explicit P1 tool list for accurate LLM routing as last-resort fallback
+- [Phase 15-deployment-documentation]: ZIP download path placed before git clone in SETUP.md — simpler for SAP consultants with no git background
+- [Phase 15-deployment-documentation]: SETUP.md absolute path warning placed immediately before .mcp.json template — addresses most common setup failure
 
 ### Pending Todos
 
-- Execute Phase 15 Plan 01 (MCP-11 deployment documentation)
+- None — v1.1 milestone complete
 
 ### Blockers/Concerns
 
@@ -162,5 +165,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 14-keyword-search-tool/14-01-PLAN.md (search_by_keyword tool + search_kb helper)
+Stopped at: Completed 15-deployment-documentation/15-01-PLAN.md (SETUP.md + README.md MCP link)
 Resume file: None
