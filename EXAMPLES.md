@@ -3914,3 +3914,1437 @@ or an explicit scope statement.  Empty responses are never returned.
 The CLAUDE.md files are the single source of truth for scope boundaries and
 disambiguation rules; `read_project_overrides()` ensures those rules are always
 loaded before any routing decision is made.
+
+---
+
+## Example 16 — T-code Discovery by Functional Description
+
+**Use case:** The caller knows *what they need to configure* ("pricing procedures in MM") but does
+NOT know which T-code to use.  This is the reverse of Example 1 (T-code lookup given a known code).
+
+The approach combines two complementary strategies:
+1. **Keyword search** (`search_kb`) — broad scan across all KB files for the functional terms
+2. **Workflow index scan** — read the module's T-code file and parse the workflow index table to
+   match descriptions, then call `extract_tcode_section` to return the full entry
+
+Both paths are tried; results are merged and ranked by relevance score.
+
+### 16a — Pure Python: discover_tcode_by_description()
+
+```python
+"""
+discover_tcode_by_description.py
+
+Resolves a functional description ("configure pricing procedures in MM") to one
+or more T-codes using keyword search + workflow-index scanning.
+
+Demonstrates:
+- search_kb()             — broad cross-KB keyword search
+- get_file_body()         — load the module T-code file body
+- extract_tcode_section() — retrieve the full T-code entry once discovered
+- Ranking results by relevance score + description match quality
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from scripts.kb_reader import (
+    KB_ROOT,
+    extract_tcode_section,
+    get_file_body,
+    normalize_module,
+    search_kb,
+)
+
+# ---------------------------------------------------------------------------
+# Result types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TcodeCandidate:
+    tcode: str
+    module: str
+    description: str          # one-line description from the workflow index
+    detail: str               # full T-code section text (from extract_tcode_section)
+    score: float              # 0.0–1.0 composite relevance score
+    source: str               # "keyword_search" | "workflow_index"
+
+
+@dataclass
+class DiscoveryResult:
+    query: str
+    candidates: list[TcodeCandidate] = field(default_factory=list)
+    top: TcodeCandidate | None = None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_TCODE_PATTERN = re.compile(r"\b([A-Z]{1,4}\d{1,3}[A-Z]?|[A-Z]{2,6})\b")
+
+# Workflow index table row — extracts | T-code | description | ... rows
+# Matches lines like: | M/08 | Create Pricing Procedure | ... |
+_INDEX_ROW = re.compile(
+    r"^\|\s*([A-Z][A-Z0-9/_]{1,9})\s*\|([^|]+)\|",
+    re.MULTILINE,
+)
+
+
+def _tokenize(text: str) -> set[str]:
+    """Lower-case word tokens from a string."""
+    return set(re.findall(r"[a-z]+", text.lower()))
+
+
+def _score(query_tokens: set[str], candidate_text: str) -> float:
+    """Fraction of query tokens present in candidate_text (0.0–1.0)."""
+    if not query_tokens:
+        return 0.0
+    cand_tokens = _tokenize(candidate_text)
+    hits = query_tokens & cand_tokens
+    return len(hits) / len(query_tokens)
+
+
+def _extract_module_from_hit(hit: dict) -> str | None:
+    """
+    Infer module from the file path of a search hit.
+    hit["file"] is typically an absolute path string.
+    """
+    path_str = str(hit.get("file", ""))
+    for mod in ("mm", "sd", "fi", "co"):
+        if f"/modules/{mod}/" in path_str or f"/{mod}/" in path_str:
+            return mod.upper()
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Strategy 1: keyword search across the full KB
+# ---------------------------------------------------------------------------
+
+def _discover_via_keyword_search(
+    query: str,
+    query_tokens: set[str],
+) -> list[TcodeCandidate]:
+    """
+    Run search_kb() and extract T-codes mentioned in result snippets.
+    Returns candidates with scores based on token overlap.
+    """
+    hits, total = search_kb(query, max_results=15)
+    candidates: list[TcodeCandidate] = []
+
+    for hit in hits:
+        snippet: str = hit.get("snippet", "") or hit.get("content", "")
+        module = _extract_module_from_hit(hit) or "??"
+
+        # Find all T-code-shaped tokens in the snippet
+        for match in _TCODE_PATTERN.finditer(snippet):
+            tcode = match.group(1)
+            if len(tcode) < 2:
+                continue
+
+            # Try to pull the full T-code detail section
+            detail = extract_tcode_section(snippet, tcode) or ""
+
+            # Score = overlap between query tokens and (snippet + detail)
+            score = _score(query_tokens, snippet + " " + detail)
+
+            candidates.append(
+                TcodeCandidate(
+                    tcode=tcode,
+                    module=module,
+                    description=snippet[:120].replace("\n", " ").strip(),
+                    detail=detail,
+                    score=score,
+                    source="keyword_search",
+                )
+            )
+
+    return candidates
+
+
+# ---------------------------------------------------------------------------
+# Strategy 2: scan the module workflow index table
+# ---------------------------------------------------------------------------
+
+def _discover_via_workflow_index(
+    query: str,
+    query_tokens: set[str],
+    module: str | None = None,
+) -> list[TcodeCandidate]:
+    """
+    Load the T-code file for one or all modules, parse the workflow index table,
+    and score each row against the query.
+
+    The workflow index table looks like:
+        | T-code | Description | Subarea | Notes |
+        | M/08   | Create Pricing Procedure | Pricing | ... |
+    """
+    modules_to_scan = [module] if module else ["MM", "SD", "FI", "CO"]
+    candidates: list[TcodeCandidate] = []
+
+    for mod in modules_to_scan:
+        body, err = get_file_body("tcodes", mod.lower())
+        if err or not body:
+            continue
+
+        for row_match in _INDEX_ROW.finditer(body):
+            tcode = row_match.group(1).strip()
+            description = row_match.group(2).strip()
+
+            score = _score(query_tokens, description)
+            if score == 0.0:
+                continue  # no token overlap — skip
+
+            # Fetch the full T-code section for context
+            detail = extract_tcode_section(body, tcode) or ""
+
+            # Boost score if detail text also has high overlap
+            detail_score = _score(query_tokens, detail)
+            composite = round((score * 0.6) + (detail_score * 0.4), 4)
+
+            candidates.append(
+                TcodeCandidate(
+                    tcode=tcode,
+                    module=mod.upper(),
+                    description=description,
+                    detail=detail,
+                    score=composite,
+                    source="workflow_index",
+                )
+            )
+
+    return candidates
+
+
+# ---------------------------------------------------------------------------
+# Main discovery function
+# ---------------------------------------------------------------------------
+
+def discover_tcode_by_description(
+    query: str,
+    module: str | None = None,
+    top_n: int = 5,
+    min_score: float = 0.2,
+) -> DiscoveryResult:
+    """
+    Resolve a functional description to T-code candidates.
+
+    Parameters
+    ----------
+    query   : Natural-language description, e.g. "configure pricing procedures MM"
+    module  : Optional module filter ("MM", "SD", "FI", "CO").
+              If None, all four modules are scanned.
+    top_n   : Maximum number of candidates to return (ranked by score).
+    min_score : Discard candidates below this composite score.
+
+    Returns
+    -------
+    DiscoveryResult with ranked candidates and .top pointing to the best match.
+
+    Example
+    -------
+    >>> result = discover_tcode_by_description(
+    ...     "configure pricing procedures in MM", module="MM"
+    ... )
+    >>> print(result.top.tcode)        # "M/08"
+    >>> print(result.top.description)  # "Create Pricing Procedure"
+    """
+    if module:
+        module = normalize_module(module) or module.upper()
+
+    query_tokens = _tokenize(query)
+
+    # Run both strategies
+    kw_candidates = _discover_via_keyword_search(query, query_tokens)
+    idx_candidates = _discover_via_workflow_index(query, query_tokens, module)
+
+    # Merge: if the same T-code appears in both, keep the higher score
+    merged: dict[str, TcodeCandidate] = {}
+    for cand in kw_candidates + idx_candidates:
+        key = f"{cand.module}:{cand.tcode}"
+        if key not in merged or cand.score > merged[key].score:
+            merged[key] = cand
+
+    # Filter, sort, truncate
+    ranked = sorted(
+        (c for c in merged.values() if c.score >= min_score),
+        key=lambda c: c.score,
+        reverse=True,
+    )[:top_n]
+
+    return DiscoveryResult(
+        query=query,
+        candidates=ranked,
+        top=ranked[0] if ranked else None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Display helper
+# ---------------------------------------------------------------------------
+
+def display_discovery_result(result: DiscoveryResult) -> None:
+    print(f"Query: {result.query!r}")
+    print(f"{'─' * 60}")
+
+    if not result.candidates:
+        print("No T-code candidates found above the minimum score threshold.")
+        return
+
+    for i, cand in enumerate(result.candidates, 1):
+        marker = " ◀ TOP" if i == 1 else ""
+        print(f"\n#{i}  {cand.tcode}  [{cand.module}]  score={cand.score:.2f}{marker}")
+        print(f"    Description : {cand.description}")
+        print(f"    Source      : {cand.source}")
+        if cand.detail:
+            # Show first 3 lines of the full T-code section
+            preview = "\n".join(cand.detail.splitlines()[:3])
+            print(f"    Detail      :\n      {preview}")
+
+    if result.top:
+        print(f"\n{'─' * 60}")
+        print(f"Recommended T-code: {result.top.tcode} ({result.top.description})")
+        print(f"Full detail:\n{result.top.detail}")
+
+
+# ---------------------------------------------------------------------------
+# Demo
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    # The core use case from the feedback item:
+    # "configuring pricing procedures in SAP ECC 6.0 Materials Management"
+    result = discover_tcode_by_description(
+        query="configure pricing procedures in MM",
+        module="MM",         # narrow to MM — omit to scan all modules
+        top_n=5,
+        min_score=0.2,
+    )
+    display_discovery_result(result)
+
+    # Cross-module: no module filter — discover T-codes for "settlement profile"
+    # across all modules (CO: OKO7, MM: potentially settlement-related T-codes)
+    print("\n\n" + "=" * 60)
+    print("Cross-module discovery: 'settlement profile configuration'")
+    print("=" * 60)
+    result2 = discover_tcode_by_description(
+        query="settlement profile configuration",
+        top_n=3,
+    )
+    display_discovery_result(result2)
+```
+
+**Expected output for the MM pricing procedure query:**
+
+```
+Query: 'configure pricing procedures in MM'
+────────────────────────────────────────────────────────────
+#1  M/08  [MM]  score=0.72 ◀ TOP
+    Description : Create Pricing Procedure
+    Source      : workflow_index
+    Detail      :
+      ### M/08 — Create Pricing Procedure
+      **Menu Path:** Logistics → Materials Management → Purchasing → Master Data → ...
+      **Usage:** Define a new pricing procedure (Kalkulationsschema). ...
+
+#2  M/06  [MM]  score=0.48
+    Description : Create Condition Type
+    Source      : workflow_index
+    ...
+
+Recommended T-code: M/08 (Create Pricing Procedure)
+Full detail:
+### M/08 — Create Pricing Procedure
+...
+```
+
+---
+
+### 16b — MCP Version: mcp_discover_tcode()
+
+The MCP server does not expose a dedicated "discover by description" tool, but the same
+two-strategy approach maps cleanly onto `get_module_overview` + `search_by_keyword`.
+
+```python
+"""
+mcp_discover_tcode.py
+
+T-code discovery via MCP tools:
+  1. search_by_keyword  — broad KB scan
+  2. get_module_overview — load module file index to find T-code file, then
+     call lookup_tcode for each candidate extracted from the overview
+"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+
+from fastmcp import Client
+
+
+_TCODE_PATTERN = re.compile(r"\b([A-Z]{1,4}\d{1,3}[A-Z]?|[A-Z]{2,6})\b")
+
+
+async def mcp_discover_tcode(
+    query: str,
+    module: str = "MM",
+    top_n: int = 5,
+) -> list[dict]:
+    """
+    Discover T-codes for a functional description using MCP tools.
+
+    Strategy:
+      Step 1 — search_by_keyword to find relevant KB snippets
+      Step 2 — extract T-code candidates from snippets
+      Step 3 — lookup_tcode for each candidate to get full authoritative detail
+      Step 4 — rank by how many query tokens appear in the full detail
+
+    Returns a list of dicts: [{tcode, module, detail, score}]
+    """
+    query_tokens = set(re.findall(r"[a-z]+", query.lower()))
+    candidates: dict[str, dict] = {}
+
+    async with Client("scripts/mcp_server.py") as client:
+
+        # Step 1: keyword search
+        kw_result = await client.call_tool(
+            "search_by_keyword",
+            {"query": query},
+        )
+        kw_text = kw_result.content[0].text if kw_result.content else ""
+
+        # Step 2: extract T-code candidates from search results
+        for match in _TCODE_PATTERN.finditer(kw_text):
+            tcode = match.group(1)
+            if len(tcode) < 2:
+                continue
+            if tcode not in candidates:
+                candidates[tcode] = {"tcode": tcode, "module": module, "detail": ""}
+
+        # Step 3: also pull the module overview to find additional candidates
+        overview_result = await client.call_tool(
+            "get_module_overview",
+            {"module": module},
+        )
+        overview_text = overview_result.content[0].text if overview_result.content else ""
+
+        for match in _TCODE_PATTERN.finditer(overview_text):
+            tcode = match.group(1)
+            if len(tcode) >= 2 and tcode not in candidates:
+                candidates[tcode] = {"tcode": tcode, "module": module, "detail": ""}
+
+        # Step 4: lookup each candidate for full detail
+        for tcode, entry in list(candidates.items()):
+            try:
+                detail_result = await client.call_tool(
+                    "lookup_tcode",
+                    {"tcode": tcode},
+                )
+                detail = detail_result.content[0].text if detail_result.content else ""
+                entry["detail"] = detail
+
+                # Score: fraction of query tokens in detail text
+                detail_tokens = set(re.findall(r"[a-z]+", detail.lower()))
+                hits = query_tokens & detail_tokens
+                entry["score"] = len(hits) / len(query_tokens) if query_tokens else 0.0
+            except Exception:
+                entry["score"] = 0.0
+
+    # Sort by score, return top_n
+    ranked = sorted(
+        (e for e in candidates.values() if e.get("score", 0) >= 0.15),
+        key=lambda e: e["score"],
+        reverse=True,
+    )
+    return ranked[:top_n]
+
+
+async def main() -> None:
+    print("Discovering T-code for: 'configure pricing procedures in MM'\n")
+    results = await mcp_discover_tcode(
+        query="configure pricing procedures in MM",
+        module="MM",
+        top_n=5,
+    )
+
+    if not results:
+        print("No candidates found.")
+        return
+
+    for i, r in enumerate(results, 1):
+        marker = " ◀ BEST MATCH" if i == 1 else ""
+        print(f"#{i}  {r['tcode']}  score={r['score']:.2f}{marker}")
+        if r["detail"]:
+            preview = "\n".join(r["detail"].splitlines()[:4])
+            print(f"    {preview}\n")
+
+    print(f"\nRecommended T-code: {results[0]['tcode']}")
+    print(f"\nFull detail:\n{results[0]['detail']}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+### 16c — Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Two strategies, not one | Keyword search + workflow index scan | `search_kb` finds context; the index scan finds T-codes by description match directly |
+| Score = token overlap | Fraction of query tokens in description/detail | Simple, transparent, works well for SAP functional terms; no ML dependency |
+| Composite score (60/40) | Index description (60%) + full detail (40%) | Description is a precise label; detail adds supporting context without overweighting boilerplate |
+| `min_score` threshold | 0.2 default | Filters noise (T-codes with only 1 token hit on short queries) while keeping related results |
+| Module filter optional | `module=None` scans all four modules | Enables cross-module discovery (e.g. "settlement profile" spans MM + CO) |
+| Deduplication by `module:tcode` | Keep highest score when same T-code appears in both strategies | Avoids showing M/08 twice; surface the most relevant occurrence |
+
+**When to use each approach:**
+
+- Use `discover_tcode_by_description()` (16a) when running in-process — full scoring fidelity,
+  direct KB file access, no network overhead.
+- Use `mcp_discover_tcode()` (16b) when calling the KB via MCP from an external system
+  (e.g., from the GSD-CIC platform) — same logical flow over the MCP protocol.
+
+---
+
+## Example 17 — FI SPRO Account Determination: Complete Programmatic Navigation
+
+**Use case:** Programmatically navigate SPRO configuration paths to troubleshoot account
+determination failures in the FI module — with full documentation of the KB structure,
+helper function contracts, and error handling.
+
+This example directly extends Examples 7 and 8 by filling three gaps the earlier examples left open:
+1. **KB structure** — every file path and frontmatter field is documented explicitly
+2. **Helper function contracts** — parameter types, return types, and failure behavior for all
+   functions imported from `kb_reader`
+3. **Error handling** — every file access and section lookup is guarded; callers always get
+   a typed result, never a silent `None`
+
+---
+
+### 17a — KB Structure Reference
+
+Before writing any code, understand what files exist and what they contain.
+
+```
+SAPKnowledge/                          ← KB_ROOT (set in kb_reader.py)
+│
+├── scripts/
+│   ├── kb_reader.py                   ← helper library (import from here)
+│   └── mcp_server.py                  ← FastMCP server entry point
+│
+└── modules/
+    ├── fi/
+    │   ├── CLAUDE.md                  ← module index (read this first for orientation)
+    │   ├── tcodes.md                  ← T-code reference (TCODE_FILE constant)
+    │   ├── config-spro.md             ← SPRO/IMG paths (CONFIG_FILE constant)
+    │   ├── processes.md               ← business process flows (PROCESS_FILE constant)
+    │   ├── master-data.md             ← table/field reference
+    │   ├── account-determination.md   ← OBYC/VKOA framework + all transaction keys
+    │   ├── fi-advanced.md             ← decision trees + troubleshooting (symptom-first)
+    │   └── integration.md             ← FI↔MM, FI↔SD, FI↔CO integration points
+    │
+    ├── mm/  sd/  co/                  ← same structure per module
+    │
+    └── cross-module/
+        ├── design-patterns.md
+        ├── playbooks.md
+        └── checklists.md
+```
+
+**Frontmatter schema** (YAML block at the top of every content file):
+
+```yaml
+---
+module: fi                  # which module owns this file
+content_type: config-spro   # tcodes | config-spro | processes | master-data |
+                            # account-determination | advanced | integration
+ecc_version: "6.0"
+ehp_range: "0-8"
+confidence: medium          # high | medium | low  — check before citing content
+last_verified: 2026-01-15   # ISO date; treat "low" confidence as unverified
+---
+```
+
+**`kb_reader` constants** — resolve file paths without hardcoding:
+
+```python
+from scripts.kb_reader import (
+    KB_ROOT,           # Path: repo root (SAPKnowledge/)
+    TCODE_FILE,        # str: "tcodes"     → resolves to modules/{mod}/tcodes.md
+    CONFIG_FILE,       # str: "config-spro"→ resolves to modules/{mod}/config-spro.md
+    PROCESS_FILE,      # str: "processes"  → resolves to modules/{mod}/processes.md
+    OVERVIEW_FILE,     # str: "CLAUDE"     → resolves to modules/{mod}/CLAUDE.md
+    DISAMBIGUATION_FILE,  # str: path to .claude/rules/sap-disambiguation.md
+)
+```
+
+---
+
+### 17b — Helper Function Contracts
+
+All helpers live in `scripts/kb_reader.py`. Full signatures with documented behavior:
+
+```python
+"""
+kb_reader helper contracts — what each function does, what it returns,
+and how it behaves on error.  Import paths shown for reference.
+"""
+
+from pathlib import Path
+from scripts.kb_reader import (
+    parse_frontmatter,
+    normalize_module,
+    get_file_body,
+    extract_tcode_section,
+    find_section_by_topic,
+    extract_disambiguation_rows,
+    search_kb,
+)
+
+
+# ── parse_frontmatter ────────────────────────────────────────────────────────
+
+def _contract_parse_frontmatter(filepath: Path) -> tuple[dict, str]:
+    """
+    Read a KB markdown file and split it into frontmatter + body.
+
+    Parameters
+    ----------
+    filepath : Path
+        Absolute path to a .md file inside KB_ROOT.
+
+    Returns
+    -------
+    (meta, body) where:
+      meta : dict   — parsed YAML frontmatter keys.  Empty dict {} if the file
+                      has no YAML block (not all files have frontmatter).
+      body : str    — everything after the closing '---' line.
+                      If no frontmatter exists, body = full file content.
+
+    Errors
+    ------
+    FileNotFoundError : if filepath does not exist.
+    yaml.YAMLError   : if the YAML block is malformed (rare in this KB).
+
+    Usage
+    -----
+    meta, body = parse_frontmatter(KB_ROOT / "modules" / "fi" / "config-spro.md")
+    confidence = meta.get("confidence", "unknown")   # "high" | "medium" | "low"
+    module     = meta.get("module")                  # "fi"
+    """
+    ...  # implementation in kb_reader.py
+
+
+# ── normalize_module ─────────────────────────────────────────────────────────
+
+def _contract_normalize_module(raw: str) -> str | None:
+    """
+    Canonicalize a user-supplied module string.
+
+    Parameters
+    ----------
+    raw : str   — "fi", "FI", "  Fi  ", "financial" (partial matches supported)
+
+    Returns
+    -------
+    Uppercase canonical key ("MM" | "SD" | "FI" | "CO") or None if unrecognized.
+
+    Usage
+    -----
+    mod = normalize_module("fi")   # → "FI"
+    mod = normalize_module("xyz")  # → None  (unsupported module)
+    """
+    ...
+
+
+# ── get_file_body ─────────────────────────────────────────────────────────────
+
+def _contract_get_file_body(template: str, module: str) -> tuple[str, str]:
+    """
+    Load the body text of a named KB file for a given module.
+
+    Parameters
+    ----------
+    template : str   — one of the FILE constants: "tcodes", "config-spro",
+                        "processes", "CLAUDE", "account-determination", etc.
+                        Matches the filename stem (without .md extension).
+    module   : str   — canonical module key, case-insensitive ("fi", "FI").
+
+    Returns
+    -------
+    (body, source) where:
+      body   : str  — file content after frontmatter.
+                      Empty string "" if the file does not exist.
+      source : str  — human-readable path label, e.g.
+                        "modules/fi/config-spro.md"
+                      Returns "not found" if the file does not exist.
+
+    Note: get_file_body NEVER raises — missing files return ("", "not found").
+    This makes it safe to call without a try/except.
+
+    Usage
+    -----
+    body, source = get_file_body("config-spro", "FI")
+    if not body:
+        print(f"File not found: {source}")
+    """
+    ...
+
+
+# ── extract_tcode_section ─────────────────────────────────────────────────────
+
+def _contract_extract_tcode_section(body: str, tcode: str) -> str | None:
+    """
+    Extract the full documentation block for a single T-code from a tcodes.md body.
+
+    Parameters
+    ----------
+    body  : str   — full body text of a tcodes.md file (from get_file_body or
+                    parse_frontmatter).
+    tcode : str   — T-code key, case-insensitive ("FBZP", "fbzp", "M/08").
+
+    Returns
+    -------
+    str   — the complete markdown section from the T-code heading to the next
+            heading at the same level.  Includes Menu Path, Usage, Gotcha, etc.
+    None  — if the T-code heading is not found in body.
+
+    Usage
+    -----
+    body, _ = get_file_body("tcodes", "FI")
+    section = extract_tcode_section(body, "FBZP")
+    if section is None:
+        print("FBZP not documented in FI tcodes.md")
+    """
+    ...
+
+
+# ── find_section_by_topic ─────────────────────────────────────────────────────
+
+def _contract_find_section_by_topic(body: str, topic: str) -> str | None:
+    """
+    Find a section in a KB file body by approximate heading match.
+
+    Parameters
+    ----------
+    body  : str   — full body text of any KB markdown file.
+    topic : str   — search term matched case-insensitively against heading text.
+                    Partial matches work: "GBB" matches "## GBB — Goods Issue".
+
+    Returns
+    -------
+    str   — the matched section text from the heading to the next same-level
+            heading.  May be several hundred characters or several kilobytes
+            depending on section length.
+    None  — if no heading containing topic is found.
+
+    Usage
+    -----
+    body, _ = get_file_body("account-determination", "FI")
+    gbb_section = find_section_by_topic(body, "GBB")
+    if gbb_section is None:
+        print("GBB section not found")
+    """
+    ...
+
+
+# ── extract_disambiguation_rows ───────────────────────────────────────────────
+
+def _contract_extract_disambiguation_rows(body: str, topic: str) -> str | None:
+    """
+    Extract matching rows from the ECC 6 vs S/4HANA disambiguation table.
+
+    Parameters
+    ----------
+    body  : str   — body of sap-disambiguation.md (load via parse_frontmatter).
+    topic : str   — filter term; rows whose "Area" column contains topic
+                    (case-insensitive) are returned.
+
+    Returns
+    -------
+    str   — markdown table rows matching the topic, including the header row.
+    None  — if no rows match.
+
+    Usage
+    -----
+    _, dis_body = parse_frontmatter(KB_ROOT / ".claude/rules/sap-disambiguation.md")
+    rows = extract_disambiguation_rows(dis_body, "vendor master")
+    """
+    ...
+
+
+# ── search_kb ─────────────────────────────────────────────────────────────────
+
+def _contract_search_kb(query: str, max_results: int = 10) -> tuple[list[dict], int]:
+    """
+    Full-text keyword search across all KB files.
+
+    Parameters
+    ----------
+    query       : str   — space-separated keywords; all must be present in a
+                          result snippet for it to be returned.
+    max_results : int   — cap on returned hits (default 10).
+
+    Returns
+    -------
+    (hits, total) where:
+      hits  : list[dict]  — each dict has keys:
+                "file"    : str   absolute file path
+                "heading" : str   nearest markdown heading above the match
+                "snippet" : str   ~200 char excerpt around the match
+                "score"   : int   hit count for ranking
+      total : int   — total number of hits before truncation.
+
+    Note: Returns ([], 0) on no hits — never raises.
+
+    Usage
+    -----
+    hits, total = search_kb("OBYC GBB account modifier")
+    for hit in hits:
+        print(hit["heading"], hit["snippet"][:80])
+    """
+    ...
+```
+
+---
+
+### 17c — Full Implementation: navigate_spro_for_account_determination()
+
+With the KB structure and helper contracts documented, here is the complete,
+error-handled implementation.
+
+```python
+"""
+fi_spro_account_determination.py
+
+Programmatic SPRO navigation for FI account determination troubleshooting.
+
+Setup
+-----
+1. Run from the SAPKnowledge/ repo root:
+       python examples/fi_spro_account_determination.py
+   OR add the scripts/ directory to sys.path before importing:
+       import sys; sys.path.insert(0, "scripts")
+
+2. No external dependencies beyond the standard library + PyYAML:
+       pip install pyyaml
+
+3. The MCP variant (Section 17d) additionally requires:
+       pip install fastmcp
+"""
+
+from __future__ import annotations
+
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
+
+# ── path setup ──────────────────────────────────────────────────────────────
+# Adjust if running from outside the repo root
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+
+from kb_reader import (  # noqa: E402 — import after path manipulation
+    KB_ROOT,
+    CONFIG_FILE,
+    TCODE_FILE,
+    extract_tcode_section,
+    find_section_by_topic,
+    get_file_body,
+    parse_frontmatter,
+    search_kb,
+)
+
+# ── KB file paths ────────────────────────────────────────────────────────────
+# These are the FI-specific files used in account determination troubleshooting.
+# Resolved at module load time so missing files surface immediately.
+
+_FI_ACCOUNT_DET_PATH = KB_ROOT / "modules" / "fi" / "account-determination.md"
+_FI_ADVANCED_PATH    = KB_ROOT / "modules" / "fi" / "fi-advanced.md"
+_FI_CONFIG_PATH      = KB_ROOT / "modules" / "fi" / "config-spro.md"
+_MM_CONFIG_PATH      = KB_ROOT / "modules" / "mm" / "config-spro.md"
+
+# ── result types ─────────────────────────────────────────────────────────────
+
+Confidence = Literal["high", "medium", "low", "unknown"]
+
+@dataclass
+class Spro:
+    """A located SPRO configuration path."""
+    t_code: str           # direct T-code shortcut (e.g. "OBYC")
+    img_path: str         # SPRO IMG menu path
+    description: str      # what this config controls
+    source_file: str      # which KB file this came from
+
+@dataclass
+class AccountDetDiagnosis:
+    """Structured result from navigate_spro_for_account_determination()."""
+    scenario: str
+    confidence: Confidence
+    transaction_key: str | None          # e.g. "GBB", "BSX", "WRX"
+    determination_logic: str             # how the account is determined
+    spro_entries: list[Spro]             # where to configure the fix
+    resolution_steps: str                # step-by-step resolution
+    fallback_used: bool                  # True if any step used a fallback path
+    warnings: list[str] = field(default_factory=list)
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+# Transaction key keywords found in scenario text → which key to look up
+_TKEY_SIGNALS: dict[str, str] = {
+    "GBB":   "GBB",   "goods issue":          "GBB",
+    "VBR":   "GBB",   "production consumpt":  "GBB",
+    "BSX":   "BSX",   "inventory posting":    "BSX",
+    "WRX":   "WRX",   "GR/IR":               "WRX",   "goods receipt":  "WRX",
+    "PRD":   "PRD",   "price difference":     "PRD",
+    "AUM":   "AUM",   "transfer posting":     "AUM",
+    "VKOA":  "VKOA",  "revenue":              "VKOA",  "billing":        "VKOA",
+    "COGS":  "VKOA",  "cost of goods sold":   "VKOA",
+    "OBYC":  "OBYC",  "account determination":"OBYC",
+}
+
+# Symptom keywords → heading fragments in fi-advanced.md
+_SYMPTOM_SIGNALS: dict[str, str] = {
+    "f110":         "F110 Payment Proposal",
+    "payment run":  "F110 Payment Proposal",
+    "vendor item":  "F110 Payment Proposal Does Not Pick Up",
+    "bank account": "F110 Bank Account",
+    "period":       "Posting Period Not Open",
+    "balance":      "Balance Sheet Does Not Balance",
+    "split":        "GLT2201",
+    "depreciation": "AJAB Fails",
+    "fs10n":        "FS10N Shows Zero",
+    "asset":        "AJAB Fails",
+}
+
+
+def _detect_transaction_key(scenario: str) -> str | None:
+    """Return the most relevant OBYC transaction key for a scenario string."""
+    s = scenario.lower()
+    for signal, tkey in _TKEY_SIGNALS.items():
+        if signal.lower() in s:
+            return tkey
+    return None
+
+
+def _load_fi_account_det() -> tuple[dict, str]:
+    """
+    Load account-determination.md.  Returns (meta, body).
+    Raises FileNotFoundError with a clear message if the file is missing.
+    """
+    if not _FI_ACCOUNT_DET_PATH.exists():
+        raise FileNotFoundError(
+            f"FI account-determination.md not found at {_FI_ACCOUNT_DET_PATH}. "
+            "Verify KB_ROOT is set correctly in kb_reader.py."
+        )
+    return parse_frontmatter(_FI_ACCOUNT_DET_PATH)
+
+
+def _load_fi_advanced() -> tuple[dict, str]:
+    """Load fi-advanced.md (decision trees + symptom troubleshooting)."""
+    if not _FI_ADVANCED_PATH.exists():
+        raise FileNotFoundError(
+            f"fi-advanced.md not found at {_FI_ADVANCED_PATH}."
+        )
+    return parse_frontmatter(_FI_ADVANCED_PATH)
+
+
+def _spro_for_transaction_key(tkey: str, config_body: str, source: str) -> Spro | None:
+    """
+    Locate the SPRO path for a given transaction key inside a config-spro body.
+    Returns an Spro dataclass or None if the section is not found.
+    """
+    section = find_section_by_topic(config_body, tkey)
+    if not section:
+        return None
+
+    # Extract T-code from the section (first occurrence of **T-code:** pattern)
+    import re
+    tcode_match = re.search(r"\*\*T-code:\*\*\s*([A-Z0-9/_]{2,10})", section)
+    img_match   = re.search(r"\*\*IMG Path:\*\*\s*(.+)", section)
+
+    return Spro(
+        t_code      = tcode_match.group(1) if tcode_match else tkey,
+        img_path    = img_match.group(1).strip() if img_match else "See SPRO",
+        description = section[:200].replace("\n", " ").strip(),
+        source_file = source,
+    )
+
+
+def _collect_spro_entries(
+    tkey: str | None,
+    scenario: str,
+    warnings: list[str],
+) -> list[Spro]:
+    """
+    Build the list of SPRO entries relevant to this scenario.
+
+    Strategy:
+      1. FI config-spro.md → look for the transaction key section
+      2. MM config-spro.md → OBYC lives in MM, not FI
+      3. If both miss, fall back to search_kb for any config-spro.md mention
+    """
+    entries: list[Spro] = []
+
+    # Try FI config first
+    fi_body, fi_src = get_file_body(CONFIG_FILE, "FI")
+    if fi_body and tkey:
+        spro = _spro_for_transaction_key(tkey, fi_body, fi_src)
+        if spro:
+            entries.append(spro)
+
+    # OBYC always lives in MM config, not FI config
+    mm_body, mm_src = get_file_body(CONFIG_FILE, "MM")
+    if mm_body:
+        search_term = tkey or "account determination"
+        spro = _spro_for_transaction_key(search_term, mm_body, mm_src)
+        if spro:
+            entries.append(spro)
+        elif tkey:
+            # Try the broader "account determination" section in MM
+            spro = _spro_for_transaction_key("account determination", mm_body, mm_src)
+            if spro:
+                entries.append(spro)
+
+    # Fallback: keyword search across the whole KB
+    if not entries:
+        warnings.append(
+            f"No SPRO section found for '{tkey or scenario}' in FI or MM config files. "
+            "Falling back to search_kb."
+        )
+        hits, _ = search_kb(f"{tkey or ''} SPRO account determination configuration")
+        for hit in hits[:2]:
+            entries.append(Spro(
+                t_code      = "OBYC",
+                img_path    = hit.get("heading", "See SPRO"),
+                description = hit.get("snippet", "")[:200],
+                source_file = str(hit.get("file", "search result")),
+            ))
+
+    return entries
+
+
+# ── main function ─────────────────────────────────────────────────────────────
+
+def navigate_spro_for_account_determination(
+    scenario: str,
+    min_confidence: Literal["high", "medium", "low"] = "low",
+) -> AccountDetDiagnosis:
+    """
+    Navigate SPRO configuration paths for an FI account determination scenario.
+
+    Parameters
+    ----------
+    scenario : str
+        Free-text description of the problem, e.g.:
+          "GI to production order — no GL account found for GBB/VBR"
+          "GR against PO — BSX not posting to inventory account"
+          "F110 payment proposal missing vendor items"
+          "Revenue posting — no GL account for VKOA condition type KOFI"
+
+    min_confidence : str
+        Minimum KB confidence level to accept without a warning.
+        "low"    → accept all content (default)
+        "medium" → warn if content is low-confidence
+        "high"   → warn if content is medium or low-confidence
+
+    Returns
+    -------
+    AccountDetDiagnosis
+        Fully populated result including:
+        - transaction_key  : detected OBYC transaction key (or None)
+        - determination_logic : how the account determination works
+        - spro_entries     : list of Spro objects with T-code + IMG path
+        - resolution_steps : step-by-step fix from fi-advanced.md
+        - warnings         : any fallbacks or confidence issues encountered
+
+    Raises
+    ------
+    FileNotFoundError
+        If critical KB files are missing (account-determination.md, fi-advanced.md).
+        get_file_body() calls for config files are safe and never raise.
+
+    Examples
+    --------
+    >>> d = navigate_spro_for_account_determination(
+    ...     "GI to production order — GBB VBR no GL account found"
+    ... )
+    >>> print(d.transaction_key)      # "GBB"
+    >>> for s in d.spro_entries:
+    ...     print(s.t_code, s.img_path)
+    """
+    warnings: list[str] = []
+    fallback_used = False
+
+    # ── Step 1: Load account-determination.md (required — raises if missing) ──
+    acct_meta, acct_body = _load_fi_account_det()
+
+    confidence: Confidence = acct_meta.get("confidence", "unknown")  # type: ignore[assignment]
+    _CONFIDENCE_RANK = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+    min_rank = _CONFIDENCE_RANK.get(min_confidence, 1)
+    if _CONFIDENCE_RANK.get(confidence, 0) < min_rank:
+        warnings.append(
+            f"account-determination.md has confidence='{confidence}', "
+            f"below requested minimum='{min_confidence}'. Verify before citing."
+        )
+
+    # ── Step 2: Detect transaction key from scenario text ────────────────────
+    tkey = _detect_transaction_key(scenario)
+
+    # ── Step 3: Extract determination logic ─────────────────────────────────
+    determination_logic: str
+    if tkey:
+        section = find_section_by_topic(acct_body, tkey)
+        if section:
+            determination_logic = section
+        else:
+            # Tkey detected but not found as a heading — search for it in body
+            hits, _ = search_kb(f"{tkey} account determination FI")
+            if hits:
+                determination_logic = hits[0].get("snippet", "")
+                fallback_used = True
+                warnings.append(
+                    f"Transaction key '{tkey}' not found as a heading in "
+                    "account-determination.md; using search_kb result."
+                )
+            else:
+                determination_logic = (
+                    f"Transaction key '{tkey}' not documented in KB. "
+                    "Refer to SAP Help for the OBYC transaction key reference."
+                )
+                fallback_used = True
+                warnings.append(f"No KB content found for transaction key '{tkey}'.")
+    else:
+        # No specific key detected — return the OBYC framework overview
+        overview = find_section_by_topic(acct_body, "OBYC Framework")
+        if overview is None:
+            overview = find_section_by_topic(acct_body, "OBYC")
+        determination_logic = overview or acct_body[:1500]
+        fallback_used = True
+        warnings.append(
+            "No transaction key detected in scenario. "
+            "Returning OBYC framework overview. Refine the scenario with "
+            "the specific transaction key (GBB, BSX, WRX, etc.) for a targeted result."
+        )
+
+    # ── Step 4: Locate SPRO configuration paths ──────────────────────────────
+    spro_entries = _collect_spro_entries(tkey, scenario, warnings)
+    if not spro_entries:
+        fallback_used = True
+
+    # ── Step 5: Extract resolution steps from fi-advanced.md ─────────────────
+    adv_meta, adv_body = _load_fi_advanced()
+    adv_confidence: Confidence = adv_meta.get("confidence", "unknown")  # type: ignore[assignment]
+    if _CONFIDENCE_RANK.get(adv_confidence, 0) < min_rank:
+        warnings.append(
+            f"fi-advanced.md has confidence='{adv_confidence}'. "
+            "Verify troubleshooting steps before applying."
+        )
+
+    resolution_steps: str | None = None
+    scenario_lower = scenario.lower()
+
+    for signal, heading in _SYMPTOM_SIGNALS.items():
+        if signal in scenario_lower:
+            resolution_steps = find_section_by_topic(adv_body, heading)
+            if resolution_steps:
+                break
+
+    # Also try the transaction key as a symptom heading
+    if resolution_steps is None and tkey:
+        resolution_steps = find_section_by_topic(adv_body, tkey)
+
+    # Final fallback: generic OBYC pitfall section
+    if resolution_steps is None:
+        resolution_steps = find_section_by_topic(adv_body, "Pitfall")
+        if resolution_steps is None:
+            # Last resort: keyword search
+            hits, _ = search_kb(f"{scenario} resolution fix")
+            resolution_steps = hits[0].get("snippet", "") if hits else (
+                "No specific resolution found in KB. "
+                "Check modules/fi/fi-advanced.md troubleshooting section manually."
+            )
+            fallback_used = True
+            warnings.append("Resolution steps not found in fi-advanced.md; used search_kb fallback.")
+
+    return AccountDetDiagnosis(
+        scenario            = scenario,
+        confidence          = confidence,
+        transaction_key     = tkey,
+        determination_logic = determination_logic,
+        spro_entries        = spro_entries,
+        resolution_steps    = resolution_steps or "",
+        fallback_used       = fallback_used,
+        warnings            = warnings,
+    )
+
+
+# ── display ───────────────────────────────────────────────────────────────────
+
+def display_diagnosis(d: AccountDetDiagnosis) -> None:
+    width = 66
+
+    print(f"\n{'═' * width}")
+    print(f"  FI Account Determination Diagnosis")
+    print(f"{'═' * width}")
+    print(f"  Scenario       : {d.scenario}")
+    print(f"  Transaction Key: {d.transaction_key or 'not detected'}")
+    print(f"  KB Confidence  : {d.confidence}")
+    if d.fallback_used:
+        print(f"  ⚠ Fallback     : one or more steps used a fallback path")
+
+    if d.warnings:
+        print(f"\n  Warnings:")
+        for w in d.warnings:
+            print(f"    • {w}")
+
+    print(f"\n{'─' * width}")
+    print("  ACCOUNT DETERMINATION LOGIC")
+    print(f"{'─' * width}")
+    print(d.determination_logic[:800])
+
+    print(f"\n{'─' * width}")
+    print("  SPRO CONFIGURATION PATHS")
+    print(f"{'─' * width}")
+    if d.spro_entries:
+        for i, s in enumerate(d.spro_entries, 1):
+            print(f"\n  [{i}] T-code : {s.t_code}")
+            print(f"      IMG    : {s.img_path}")
+            print(f"      Notes  : {s.description[:160]}")
+            print(f"      Source : {s.source_file}")
+    else:
+        print("  No SPRO entries found — check KB coverage for this scenario.")
+
+    print(f"\n{'─' * width}")
+    print("  RESOLUTION STEPS")
+    print(f"{'─' * width}")
+    print(d.resolution_steps[:900])
+    print(f"\n{'═' * width}\n")
+
+
+# ── demo ──────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    scenarios = [
+        # Transaction key detected: GBB
+        "GI to production order — no GL account found for GBB VBR",
+        # Transaction key detected: BSX
+        "Inventory posting GR against PO — BSX not posting to inventory account",
+        # Transaction key detected: VKOA (via 'revenue')
+        "Revenue posting in billing — no GL account for VKOA condition type KOFI",
+        # Symptom-based (no transaction key): F110
+        "F110 payment proposal missing vendor items — items not picked up",
+        # Ambiguous: falls back to OBYC framework overview
+        "Account determination error when posting depreciation",
+    ]
+
+    for scenario in scenarios:
+        diagnosis = navigate_spro_for_account_determination(scenario)
+        display_diagnosis(diagnosis)
+```
+
+---
+
+### 17d — MCP Version
+
+The same workflow via MCP tools for use from the GSD-CIC platform or any external caller.
+
+```python
+"""
+mcp_fi_spro_account_determination.py
+
+MCP-based SPRO navigation for FI account determination.
+Mirrors the pure-Python approach in 17c with no direct file access.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+from dataclasses import dataclass, field
+
+from fastmcp import Client
+
+_TKEY_SIGNALS = {
+    "GBB": "GBB", "goods issue": "GBB", "VBR": "GBB",
+    "BSX": "BSX", "inventory": "BSX",
+    "WRX": "WRX", "GR/IR": "WRX", "goods receipt": "WRX",
+    "PRD": "PRD", "price difference": "PRD",
+    "VKOA": "VKOA", "revenue": "VKOA", "billing": "VKOA",
+}
+
+
+@dataclass
+class McpDiagnosis:
+    scenario: str
+    transaction_key: str | None
+    determination_logic: str
+    spro_path: str
+    resolution_hint: str
+    warnings: list[str] = field(default_factory=list)
+
+
+def _detect_tkey(scenario: str) -> str | None:
+    s = scenario.lower()
+    for signal, tkey in _TKEY_SIGNALS.items():
+        if signal.lower() in s:
+            return tkey
+    return None
+
+
+async def mcp_navigate_spro(scenario: str) -> McpDiagnosis:
+    """
+    Navigate SPRO for FI account determination via MCP tools.
+
+    Tool usage:
+      - get_config_path(module="FI",  topic=tkey)  → SPRO path in FI config
+      - get_config_path(module="MM",  topic=tkey)  → SPRO path in MM config (OBYC lives here)
+      - search_by_keyword(query=...)               → broad KB fallback
+      - get_process_flow(module="FI", process=...) → resolution steps
+    """
+    warnings: list[str] = []
+    tkey = _detect_tkey(scenario)
+
+    async with Client("scripts/mcp_server.py") as client:
+
+        # ── Step 1: Account determination logic ─────────────────────────────
+        search_term = f"{tkey} account determination" if tkey else "OBYC account determination FI"
+        logic_result = await client.call_tool(
+            "search_by_keyword",
+            {"query": search_term},
+        )
+        determination_logic = (
+            logic_result.content[0].text if logic_result.content else ""
+        )
+        if not determination_logic:
+            warnings.append(f"search_by_keyword returned no results for '{search_term}'.")
+
+        # ── Step 2: SPRO config path ─────────────────────────────────────────
+        # Try FI config first, then MM config (OBYC lives in MM SPRO)
+        spro_text = ""
+        config_topic = tkey or "automatic account determination"
+
+        fi_config = await client.call_tool(
+            "get_config_path",
+            {"module": "FI", "topic": config_topic},
+        )
+        fi_text = fi_config.content[0].text if fi_config.content else ""
+
+        mm_config = await client.call_tool(
+            "get_config_path",
+            {"module": "MM", "topic": config_topic},
+        )
+        mm_text = mm_config.content[0].text if mm_config.content else ""
+
+        if fi_text and "not found" not in fi_text.lower():
+            spro_text += f"[FI SPRO]\n{fi_text}\n\n"
+        if mm_text and "not found" not in mm_text.lower():
+            spro_text += f"[MM SPRO — OBYC lives here]\n{mm_text}"
+
+        if not spro_text:
+            # Fallback: keyword search for SPRO path mentions
+            spro_search = await client.call_tool(
+                "search_by_keyword",
+                {"query": f"{config_topic} SPRO IMG configuration path"},
+            )
+            spro_text = spro_search.content[0].text if spro_search.content else ""
+            warnings.append(
+                f"get_config_path returned no results for '{config_topic}'; "
+                "used search_by_keyword fallback for SPRO path."
+            )
+
+        # ── Step 3: Resolution steps ─────────────────────────────────────────
+        # F110 and payment scenarios → use FI process flow
+        # Account determination scenarios → use search for troubleshooting content
+        resolution_hint = ""
+        if any(k in scenario.lower() for k in ("f110", "payment", "vendor item")):
+            proc = await client.call_tool(
+                "get_process_flow",
+                {"module": "FI", "process": "AP payment run"},
+            )
+            resolution_hint = proc.content[0].text if proc.content else ""
+        else:
+            res_search = await client.call_tool(
+                "search_by_keyword",
+                {"query": f"{tkey or 'account determination'} error missing GL account resolution"},
+            )
+            resolution_hint = res_search.content[0].text if res_search.content else ""
+
+        if not resolution_hint:
+            warnings.append("No resolution content found via MCP tools.")
+
+    return McpDiagnosis(
+        scenario            = scenario,
+        transaction_key     = tkey,
+        determination_logic = determination_logic[:1200],
+        spro_path           = spro_text[:1200],
+        resolution_hint     = resolution_hint[:900],
+        warnings            = warnings,
+    )
+
+
+async def main() -> None:
+    scenarios = [
+        "GI to production order — no GL account found for GBB VBR",
+        "GR against PO — BSX not posting to inventory account",
+        "Revenue posting — no GL account for VKOA condition type KOFI",
+    ]
+    for scenario in scenarios:
+        d = await mcp_navigate_spro(scenario)
+        print(f"\n{'═' * 60}")
+        print(f"Scenario : {d.scenario}")
+        print(f"Tkey     : {d.transaction_key or 'not detected'}")
+        if d.warnings:
+            print(f"Warnings : {'; '.join(d.warnings)}")
+        print(f"\nDetermination Logic:\n{d.determination_logic[:500]}")
+        print(f"\nSPRO Path:\n{d.spro_path[:400]}")
+        print(f"\nResolution:\n{d.resolution_hint[:400]}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+### 17e — Error Handling Reference
+
+Every function call in this example has a defined failure behavior:
+
+| Call | Failure Mode | Handled By |
+|------|-------------|------------|
+| `parse_frontmatter(path)` | `FileNotFoundError` if file missing | `_load_fi_account_det()` / `_load_fi_advanced()` raise with clear message |
+| `get_file_body(template, module)` | Returns `("", "not found")` — never raises | `if not body:` guard before `find_section_by_topic` |
+| `find_section_by_topic(body, topic)` | Returns `None` if heading not found | Explicit `if section is None:` at every call site |
+| `extract_tcode_section(body, tcode)` | Returns `None` if T-code not in file | `if section is None:` guard |
+| `search_kb(query)` | Returns `([], 0)` on no hits — never raises | `if hits:` guard before accessing `hits[0]` |
+| `client.call_tool(...)` | Raises on network/server error | Wrap in `try/except Exception` for production use |
+| Frontmatter `meta.get("confidence")` | Returns `None` if field missing | `.get("confidence", "unknown")` default |
+
+**Pattern: never propagate `None` to the caller**
+
+```python
+# BAD — silent None if section not found
+result["logic"] = find_section_by_topic(body, "GBB")
+
+# GOOD — always a string, fallback is explicit
+section = find_section_by_topic(body, "GBB")
+result["logic"] = section or "GBB section not found in account-determination.md"
+```
+
+**Pattern: confidence gate before citing**
+
+```python
+meta, body = parse_frontmatter(path)
+confidence = meta.get("confidence", "unknown")
+if confidence == "low":
+    warnings.append(f"{path.name} is low-confidence — verify before citing.")
+# proceed anyway, but the caller knows to verify
+```
