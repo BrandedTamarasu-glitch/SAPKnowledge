@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sap-kb": {
+      "command": "/home/corye/Claude/SAPKnowledge/.venv/bin/python",
+      "args": ["/home/corye/Claude/SAPKnowledge/scripts/mcp_server.py"]
+    }
+  }
+}
