@@ -1,0 +1,80 @@
+# SAP ECC 6.0 Knowledge Base
+
+> Curated reference for SAP ECC 6.0 (Enhancement Packs 0–8) covering transaction codes, SPRO/IMG configuration paths, business process flows, master data, and cross-module integration for MM, SD, FI, and CO. Includes 17 runnable Python examples for programmatic access via direct file reads or MCP. S/4HANA differences are noted for disambiguation only — ECC 6.0 is the primary reference throughout.
+
+This knowledge base is structured for use with Claude Code and Claude Desktop. Content is organized by module. Each module has a CLAUDE.md index file that lists its content files and when to read each one. Navigation rules in `.claude/rules/` map query topics to the correct module and file.
+
+## MM — Materials Management
+
+- [modules/mm/CLAUDE.md](modules/mm/CLAUDE.md): Module index — file list, key concepts, when to read each file
+- [modules/mm/tcodes.md](modules/mm/tcodes.md): ~80 T-codes covering procurement (ME21N, ME23N), goods movements (MIGO), invoice verification (MIRO, MR8M), inventory management (MI01, MI07), vendor master (XK01, MK01), and MRP (MD01, MD04)
+- [modules/mm/config-spro.md](modules/mm/config-spro.md): SPRO/IMG configuration — purchasing org setup, document types, number ranges, account determination (OBYC transaction keys GBB/BSX/WRX/PRD), movement type configuration, valuation, MRP
+- [modules/mm/processes.md](modules/mm/processes.md): Business process flows — Procure-to-Pay end to end, goods receipt against PO, invoice verification and parking, physical inventory, consignment
+- [modules/mm/master-data.md](modules/mm/master-data.md): Table/field reference — EKKO/EKPO (purchase orders), MKPF/MSEG (material documents), LFA1 (vendor master), MARA/MARC/MARD (material master), MBEW (material valuation)
+- [modules/mm/integration.md](modules/mm/integration.md): MM-FI integration points — goods movement account determination, GR/IR clearing (WRX), invoice posting flow, Material Ledger, period-end MM-FI timing
+- [modules/mm/mm-advanced.md](modules/mm/mm-advanced.md): Decision trees (10) for MM configuration choices, troubleshooting (10 symptom-first entries), account determination walkthrough, split valuation, batch management
+
+## SD — Sales & Distribution
+
+- [modules/sd/CLAUDE.md](modules/sd/CLAUDE.md): Module index
+- [modules/sd/tcodes.md](modules/sd/tcodes.md): ~70 T-codes covering order management (VA01, VA02), delivery (VL01N, VL02N), billing (VF01, VF04), pricing (VK11, VK12), credit management (FD32, VKM1), output (NACE), customer master (XD01, VD01)
+- [modules/sd/config-spro.md](modules/sd/config-spro.md): SPRO configuration — sales document types, item categories, schedule line categories, pricing procedure (OVKK, V/08), output condition types, credit management, availability check, text determination
+- [modules/sd/processes.md](modules/sd/processes.md): Order-to-Cash process flow, returns and credit memo process, intercompany billing, third-party order processing, consignment
+- [modules/sd/master-data.md](modules/sd/master-data.md): Table reference — VBAK/VBAP (sales orders), LIKP/LIPS (deliveries), VBRK/VBRP (billing), KNA1 (customer master), KNVV (customer sales area data), KONV (pricing conditions)
+- [modules/sd/integration.md](modules/sd/integration.md): SD-FI integration — billing document to FI posting, VKOA account determination, revenue account determination, COGS posting, credit management FI interface
+- [modules/sd/sd-advanced.md](modules/sd/sd-advanced.md): Decision trees (10) for SD configuration, troubleshooting (10 symptom-first entries), pricing procedure design, availability check configuration
+
+## FI — Financial Accounting
+
+- [modules/fi/CLAUDE.md](modules/fi/CLAUDE.md): Module index
+- [modules/fi/tcodes.md](modules/fi/tcodes.md): ~90 T-codes covering GL (FB50, FS00, FAGLB03), AP (FB60, F110, FBZP, MR8M), AR (FB70, F150, FD32), asset accounting (AS01, AFAB, AW01N), bank accounting (FF67, FEBAN), period-end (F.05, AJAB, F.16)
+- [modules/fi/config-spro.md](modules/fi/config-spro.md): SPRO configuration — chart of accounts (OBD4), posting keys (OB41), document types (OBA7), fiscal year variant (OB29), field status groups, tolerance groups (OBA3/OBA4), payment terms (OBB8), dunning (FBMP), asset accounting (AO90), New GL document splitting
+- [modules/fi/processes.md](modules/fi/processes.md): GL posting process, AP invoice and payment run (F110), AR dunning, asset acquisition and depreciation, period-end close sequence, year-end close
+- [modules/fi/master-data.md](modules/fi/master-data.md): Table reference — BKPF/BSEG (FI documents), SKA1/SKB1 (GL accounts), LFA1/LFB1 (vendors), KNA1/KNB1 (customers), ANLA/ANLB (assets), FAGLFLEXT (New GL totals)
+- [modules/fi/account-determination.md](modules/fi/account-determination.md): Complete OBYC framework — all transaction keys (GBB, BSX, WRX, PRD, AUM, KON, FR1-FR6), account modifier reference, VKOA SD-FI revenue account determination, automatic posting configuration
+- [modules/fi/fi-advanced.md](modules/fi/fi-advanced.md): Decision trees (10) for FI configuration choices, troubleshooting (10 symptom-first entries including F110 payment run issues, GLT2201 document splitting errors, AJAB year-end failures, FS10N zero balance)
+- [modules/fi/integration.md](modules/fi/integration.md): FI-MM, FI-SD, FI-CO integration points — what each goods movement posts to FI, how SD billing creates FI documents, CO-FI real-time integration via primary cost elements
+
+## CO — Controlling
+
+- [modules/co/CLAUDE.md](modules/co/CLAUDE.md): Module index
+- [modules/co/tcodes.md](modules/co/tcodes.md): ~63 T-codes covering cost elements (KA01, KA06), cost centers (KS01, KSB1), internal orders (KO01, KO88), activity types (KL01, KP26), profit centers (KE51, KE5Z), product costing (CK11N, CK24, CK40N), period-end allocations (KSU5, KSV5), CO-PA (KE21N)
+- [modules/co/config-spro.md](modules/co/config-spro.md): SPRO configuration — controlling area setup (OKKP, OX19), CO versions (OKEQ), default account assignment (OKB9), cost center categories, internal order types (KOT2), settlement profiles (OKO7), allocation structures (OKO6), costing variants (OKKN), PCA substitution (1KEF)
+- [modules/co/processes.md](modules/co/processes.md): Period-end allocation (assessment vs distribution), internal order settlement, product costing run (CK11N/CK24), cost center planning, full CO period-end close sequence with dependencies
+- [modules/co/master-data.md](modules/co/master-data.md): Table reference — CSKA/CSKB (cost elements), CSKS (cost centers), AUFK (internal orders), COBRB (settlement rules), CSLA (activity types), CEPC (profit centers), COSP/COSS (CO totals), COBK/COEP (CO documents)
+- [modules/co/co-advanced.md](modules/co/co-advanced.md): Cost element mapping walkthrough (all 11 CE categories, CO-FI real-time integration, reconciliation ledger COFIT/COFIS), decision trees (10) for CO configuration, troubleshooting (10 symptom-first entries including OKB9 error, assessment zero posting, KO88 missing settlement rule, CK24 price not updating)
+- [modules/co/integration.md](modules/co/integration.md): CO-FI integration catalog — FI→CO (9 scenarios), CO→FI (4 scenarios: external settlement, KALC), CO-internal (8 scenarios). Transaction traces for FB50→CO and KO88→FI. Period-end CO-FI timing.
+
+## Cross-Module
+
+- [cross-module/CLAUDE.md](cross-module/CLAUDE.md): Cross-module index
+- [cross-module/procure-to-pay.md](cross-module/procure-to-pay.md): Complete P2P process — PR → PO → GR → invoice → payment, with MM-FI account determination at each step
+- [cross-module/order-to-cash.md](cross-module/order-to-cash.md): Complete O2C process — inquiry → quotation → sales order → delivery → PGI → billing → payment, with SD-FI account determination
+- [cross-module/record-to-report.md](cross-module/record-to-report.md): R2R end-to-end — period-end close sequence across MM, SD, FI, CO with cross-module dependencies and timing
+- [cross-module/mm-sd-integration.md](cross-module/mm-sd-integration.md): MM-SD integration — availability check, goods issue for delivery (movement type 601), stock transport orders
+- [cross-module/design-patterns.md](cross-module/design-patterns.md): Solution design patterns — choosing the right SAP approach for common business requirements across all modules
+- [cross-module/playbooks.md](cross-module/playbooks.md): Scenario playbooks — consignment, intercompany, third-party, subcontracting, split valuation, batch management, serial number management
+- [cross-module/checklists.md](cross-module/checklists.md): Month-end close checklist, year-end close checklist, period-end operator steps with T-codes
+
+## Reference
+
+- [reference/movement-types.md](reference/movement-types.md): Complete movement type reference — GR (101, 105, 107), GI (201, 261, 551), transfers (301, 303, 311, 321), returns (122, 161), with account determination impact for each
+- [reference/document-types.md](reference/document-types.md): FI document type reference — SA, KR, KZ, DR, DZ, AB, AA, WE, RE — with number ranges and allowed posting keys
+- [reference/posting-keys.md](reference/posting-keys.md): FI posting key reference — debit/credit indicators, account types, field status impact
+- [reference/org-structure.md](reference/org-structure.md): SAP org structure — client, company code, plant, storage location, sales org, purchasing org, controlling area — with cardinality, key fields, T-codes, and ECC 6 vs S/4HANA differences
+
+## Disambiguation
+
+- [.claude/rules/sap-disambiguation.md](.claude/rules/sap-disambiguation.md): ECC 6 vs S/4HANA quick-reference table — vendor master, customer master, material documents, Material Ledger, General Ledger, cost elements, PCA, controlling area — use this to avoid mixing ECC and S/4 behavior
+
+## Programmatic Access
+
+- [EXAMPLES.md](EXAMPLES.md): 17 runnable Python examples — T-code lookup, SPRO navigation, process flow extraction, account determination troubleshooting, query routing, fallback strategy, MCP client usage via fastmcp
+- [scripts/kb_reader.py](scripts/kb_reader.py): Python helper library — parse_frontmatter, get_file_body, find_section_by_topic, extract_tcode_section, search_kb, extract_disambiguation_rows
+- [scripts/mcp_server.py](scripts/mcp_server.py): FastMCP server — exposes 6 tools: lookup_tcode, get_module_overview, get_config_path, get_process_flow, compare_ecc_s4, search_by_keyword
+
+## Optional
+
+- [SETUP.md](SETUP.md): Step-by-step MCP server setup for Claude Code and Claude Desktop (Python venv, .mcp.json configuration, Windows/macOS/Linux instructions)
+- [.claude/rules/sap-routing.md](.claude/rules/sap-routing.md): Topic-to-module routing table — maps query keywords to the correct module directory
+- [.claude/rules/sap-org-structure.md](.claude/rules/sap-org-structure.md): Org structure hierarchy quick reference
