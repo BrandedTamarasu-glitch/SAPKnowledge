@@ -846,6 +846,34 @@ asyncio.run(get_co_close_tcodes_via_mcp())
 
 Fetches the IO settlement process from the CO knowledge base, validates every step for T-code completeness, cross-references receiver types to their FI integration points, and verifies that cross-module T-codes exist in the KB — producing a pass/warn/fail report.
 
+**Setup:**
+```bash
+# Run from the SAPKnowledge/ repo root
+pip install pyyaml        # only dependency beyond stdlib
+python examples/example10.py
+```
+
+**KB files used:**
+
+| Variable | File loaded | Contains |
+|----------|------------|---------|
+| `co_process_body` | `modules/co/processes.md` | CO business process flows including the IO settlement 6-step narrative and summary table |
+| `co_tcode_body` | `modules/co/tcodes.md` | ~63 CO T-codes with menu paths, usage, gotchas |
+| `fi_tcode_body` | `modules/fi/tcodes.md` | ~90 FI T-codes — needed for cross-module verification T-codes (FBL3N, AW01N, AS03) |
+| `co_integration_body` | `modules/co/integration.md` | CO-FI integration catalog: which CO transactions create FI documents |
+
+**Helper function signatures** (all from `scripts/kb_reader.py` — full contracts in Example 17b):
+
+| Function | Signature | Returns | On miss |
+|----------|-----------|---------|---------|
+| `get_file_body` | `(template: str, module: str)` | `(body: str, source: str)` | `("", "not found")` — never raises |
+| `parse_frontmatter` | `(filepath: Path)` | `(meta: dict, body: str)` | Raises `FileNotFoundError` if file missing |
+| `find_section_by_topic` | `(body: str, topic: str)` | `str \| None` | `None` if heading not found |
+| `extract_tcode_section` | `(body: str, tcode: str)` | `str \| None` | `None` if T-code not in file |
+| `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
+
+`search_kb` hit dict keys: `"file"` (path), `"heading"` (nearest heading), `"snippet"` (excerpt), `"score"` (int).
+
 ```python
 import sys
 import re
@@ -857,11 +885,19 @@ from kb_reader import (
 )
 
 # ── Load files once ──────────────────────────────────────────────────────────
+# get_file_body(template, module) → (body: str, source: str)
+#   template matches the filename stem: "processes" → modules/co/processes.md
+#   Returns ("", "not found") if file missing — never raises.
 co_process_body, co_proc_src  = get_file_body(PROCESS_FILE, "CO")
 co_tcode_body,   co_tc_src    = get_file_body(TCODE_FILE,   "CO")
 fi_process_body, fi_proc_src  = get_file_body(PROCESS_FILE, "FI")
 fi_tcode_body,   fi_tc_src    = get_file_body(TCODE_FILE,   "FI")
 
+# parse_frontmatter(path) → (meta: dict, body: str)
+#   meta  = YAML frontmatter (confidence, module, last_verified, etc.)
+#   body  = everything after the closing '---' line
+#   Raises FileNotFoundError if the file does not exist.
+#   We discard meta here (_) and only use the body for section lookups.
 co_integration_path = KB_ROOT / "modules" / "co" / "integration.md"
 _, co_integration_body = parse_frontmatter(co_integration_path)
 
@@ -942,7 +978,7 @@ def validate_step_tcodes(steps: list[dict]) -> list[dict]:
             hits, _ = search_kb(f"{tcode} settlement internal order", max_results=3)
             if hits:
                 step_results.append({"tcode": tcode, "status": "WARN",
-                                      "kb": hits[0]["source"],
+                                      "kb": hits[0]["file"],   # "file" key, not "source"
                                       "note": "found via search — no dedicated tcode entry"})
             else:
                 step_results.append({"tcode": tcode, "status": "MISSING",
