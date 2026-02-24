@@ -79,6 +79,33 @@ See [SETUP.md](SETUP.md) for step-by-step setup instructions (Python required; 1
 
 ---
 
+## Context7 Skill
+
+The knowledge base is registered as a [Context7](https://context7.com/BrandedTamarasu-glitch/SAPKnowledge) skill. Once installed, it loads automatically whenever you ask a SAP question — no commands needed.
+
+### Install
+
+```bash
+# Into the current project
+npx ctx7 skills install /BrandedTamarasu-glitch/SAPKnowledge
+
+# Globally (all projects)
+npx ctx7 skills install /BrandedTamarasu-glitch/SAPKnowledge --global
+
+# Claude Code only
+npx ctx7 skills install /BrandedTamarasu-glitch/SAPKnowledge --claude
+```
+
+The installer writes the skill into `.claude/skills/` (Claude Code) or `.cursor/skills/` (Cursor). After that, just ask SAP questions — the skill's routing instructions are injected automatically.
+
+### Discover
+
+```bash
+npx ctx7 skills search SAP
+```
+
+---
+
 ## Programmatic API
 
 The KB ships with a Python library (`scripts/kb_reader.py`) for direct programmatic access — useful for building tools, running batch queries, or integrating the KB into an application.
