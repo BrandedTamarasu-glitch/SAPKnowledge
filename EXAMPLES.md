@@ -872,7 +872,7 @@ python examples/example10.py
 | `extract_tcode_section` | `(body: str, tcode: str)` | `str \| None` | `None` if T-code not in file |
 | `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
 
-`search_kb` hit dict keys: `"file"` (path), `"heading"` (nearest heading), `"snippet"` (excerpt), `"score"` (int).
+`search_kb` hit dict keys: `"source"` (relative path), `"heading"` (nearest heading), `"excerpt"` (surrounding lines).
 
 ```python
 import sys
@@ -978,7 +978,7 @@ def validate_step_tcodes(steps: list[dict]) -> list[dict]:
             hits, _ = search_kb(f"{tcode} settlement internal order", max_results=3)
             if hits:
                 step_results.append({"tcode": tcode, "status": "WARN",
-                                      "kb": hits[0]["file"],   # "file" key, not "source"
+                                      "kb": hits[0]["source"],
                                       "note": "found via search — no dedicated tcode entry"})
             else:
                 step_results.append({"tcode": tcode, "status": "MISSING",
@@ -1132,7 +1132,7 @@ else:
     print("  Integration section not found — falling back to search")
     hits, _ = search_kb("KO88 settlement FI document category 22", max_results=3)
     for h in hits:
-        print(f"  [{h['file']}] {h['heading']}: {h['snippet'][:120]}")
+        print(f"  [{h['source']}] {h['heading']}: {h['excerpt'][:120]}")
 
 print("\n" + "=" * 70)
 print("VALIDATION COMPLETE")
@@ -1278,7 +1278,7 @@ for step in consignment[0]["config_steps"]:
 | `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
 | `normalize_module` | `(raw: str)` | `str \| None` | `None` if unrecognized |
 
-`search_kb` hit dict keys: `"file"` (path), `"heading"`, `"snippet"`, `"score"`.
+`search_kb` hit dict keys: `"source"` (relative path), `"heading"`, `"excerpt"`.
 
 **Function map** — this example defines four functions:
 
@@ -1533,8 +1533,8 @@ def enrich_with_spro_paths(
                 query = f"{primary_kw} {mod} SPRO configuration"
                 hits, _ = search_kb(query, max_results=3)
                 if hits:
-                    detail = f"(via search — no dedicated config section)\n{hits[0]['snippet']}"
-                    config_source = hits[0]["file"]   # "file" key, not "source"
+                    detail = f"(via search — no dedicated config section)\n{hits[0]['excerpt']}"
+                    config_source = hits[0]["source"]
 
             step["spro_detail"] = detail
             step["spro_source"] = config_source if detail else None
@@ -1975,7 +1975,7 @@ for key, info in d["transaction_key_info"].items():
 | `extract_tcode_section` | `(body: str, tcode: str)` | `str \| None` | `None` if not found |
 | `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
 
-`search_kb` hit dict keys: `"file"` (path), `"heading"`, `"snippet"`, `"score"`.
+`search_kb` hit dict keys: `"source"` (relative path), `"heading"`, `"excerpt"`.
 
 **Function map:**
 
@@ -2235,7 +2235,7 @@ def query_kb_for_mm_acct_failure(signals: dict, sources: dict) -> dict:
         hits, total = search_kb(query, max_results=5)
         if hits:
             fallback_text = "\n---\n".join(
-                f"[{h['file']}] {h['heading']}\n{h['snippet']}" for h in hits
+                f"[{h['source']}] {h['heading']}\n{h['excerpt']}" for h in hits
             )
             results["fallback_search"] = (
                 f"search_kb({repr(query)}) → {total}+ matches\n\n{fallback_text}",
@@ -2332,7 +2332,7 @@ def diagnose_mm_account_determination(
             diagnostic_tcodes[tcode] = usage_m.group(1).strip()[:200] if usage_m else section[:100]
         else:
             hits, _ = search_kb(f"{tcode} MM account determination simulation", max_results=1)
-            diagnostic_tcodes[tcode] = hits[0]["snippet"][:150] if hits else f"{tcode} — not in KB"
+            diagnostic_tcodes[tcode] = hits[0]["excerpt"][:150] if hits else f"{tcode} — not in KB"
 
     # Step 8: Assemble final diagnosis
     files_consulted = list({
@@ -4164,9 +4164,9 @@ def _score(query_tokens: set[str], candidate_text: str) -> float:
 def _extract_module_from_hit(hit: dict) -> str | None:
     """
     Infer module from the file path of a search hit.
-    hit["file"] is typically an absolute path string.
+    hit["source"] is the relative path string from search_kb.
     """
-    path_str = str(hit.get("file", ""))
+    path_str = str(hit.get("source", ""))
     for mod in ("mm", "sd", "fi", "co"):
         if f"/modules/{mod}/" in path_str or f"/{mod}/" in path_str:
             return mod.upper()
@@ -4189,7 +4189,7 @@ def _discover_via_keyword_search(
     candidates: list[TcodeCandidate] = []
 
     for hit in hits:
-        snippet: str = hit.get("snippet", "") or hit.get("content", "")
+        snippet: str = hit.get("excerpt", "") or hit.get("content", "")
         module = _extract_module_from_hit(hit) or "??"
 
         # Find all T-code-shaped tokens in the snippet
@@ -4848,10 +4848,9 @@ def _contract_search_kb(query: str, max_results: int = 10) -> tuple[list[dict], 
     -------
     (hits, total) where:
       hits  : list[dict]  — each dict has keys:
-                "file"    : str   absolute file path
+                "source"  : str   relative file path (e.g. "modules/fi/tcodes.md")
                 "heading" : str   nearest markdown heading above the match
-                "snippet" : str   ~200 char excerpt around the match
-                "score"   : int   hit count for ranking
+                "excerpt" : str   ~5 surrounding lines around the match
       total : int   — total number of hits before truncation.
 
     Note: Returns ([], 0) on no hits — never raises.
@@ -4860,7 +4859,7 @@ def _contract_search_kb(query: str, max_results: int = 10) -> tuple[list[dict], 
     -----
     hits, total = search_kb("OBYC GBB account modifier")
     for hit in hits:
-        print(hit["heading"], hit["snippet"][:80])
+        print(hit["heading"], hit["excerpt"][:80])
     """
     ...
 ```
@@ -5077,8 +5076,8 @@ def _collect_spro_entries(
             entries.append(Spro(
                 t_code      = "OBYC",
                 img_path    = hit.get("heading", "See SPRO"),
-                description = hit.get("snippet", "")[:200],
-                source_file = str(hit.get("file", "search result")),
+                description = hit.get("excerpt", "")[:200],
+                source_file = str(hit.get("source", "search result")),
             ))
 
     return entries
