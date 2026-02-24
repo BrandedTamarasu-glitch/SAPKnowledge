@@ -1230,6 +1230,66 @@ if section is None:
 
 Retrieves module-specific design patterns from `cross-module/design-patterns.md`, then enriches each pattern's configuration steps with the corresponding detailed SPRO path from the module's `config-spro.md`. Demonstrates multi-file chaining, iteration over multiple modules, response aggregation, and a three-tier fallback that always returns actionable content.
 
+**Setup:**
+```bash
+# Run from the SAPKnowledge/ repo root
+pip install pyyaml        # only external dependency
+python examples/example11.py
+```
+
+**Quick start — minimal working call:**
+```python
+import sys; sys.path.insert(0, "scripts")
+from example11 import get_design_patterns_with_spro
+
+# All patterns, all modules
+patterns = get_design_patterns_with_spro()
+
+# Single pattern by keyword
+consignment = get_design_patterns_with_spro(pattern_keywords=["consignment"])
+
+# Filtered to MM and FI SPRO paths only
+mts = get_design_patterns_with_spro(
+    pattern_keywords=["Make-to-Stock"],
+    modules_filter=["MM", "FI"],
+)
+
+# Each pattern has: pattern_number, pattern_name, description,
+#                   approach, when_to_use, config_steps[]
+# Each config_step: module, step, tcode_spro_raw, spro_detail, spro_source
+for step in consignment[0]["config_steps"]:
+    print(step["tcode_spro_raw"], "→", step["spro_source"] or "not in config-spro.md")
+```
+
+**KB files accessed:**
+
+| File | Accessed via | Contains |
+|------|-------------|---------|
+| `cross-module/design-patterns.md` | `parse_frontmatter(path)` | 12 solution design patterns, each with business requirement, SAP approach, and Configuration Summary table |
+| `modules/{mod}/config-spro.md` | `get_file_body(CONFIG_FILE, mod)` | SPRO/IMG paths for each module — searched to enrich each config step |
+
+**Helper function signatures** (implementations in `scripts/kb_reader.py` — full contracts in Example 17b):
+
+| Function | Signature | Returns | On miss |
+|----------|-----------|---------|---------|
+| `parse_frontmatter` | `(filepath: Path)` | `(meta: dict, body: str)` | Raises `FileNotFoundError` |
+| `get_file_body` | `(template: str, module: str)` | `(body: str, source: str)` | `("", "not found")` — never raises |
+| `find_section_by_topic` | `(body: str, topic: str)` | `str \| None` | `None` if not found |
+| `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
+| `normalize_module` | `(raw: str)` | `str \| None` | `None` if unrecognized |
+
+`search_kb` hit dict keys: `"file"` (path), `"heading"`, `"snippet"`, `"score"`.
+
+**Function map** — this example defines four functions:
+
+| Function | Role |
+|----------|------|
+| `parse_design_patterns(pattern_keywords)` | Load + parse `design-patterns.md` into structured dicts |
+| `enrich_with_spro_paths(patterns, modules_filter)` | For each config step, look up its SPRO detail in `config-spro.md` |
+| `get_design_patterns_with_spro(...)` | Top-level: calls both functions, raises if no patterns match |
+| `print_summary_table` / `print_pattern_detail` | Display helpers for the demo output |
+
+**Full implementation:**
 ```python
 import sys
 import re
@@ -1473,8 +1533,8 @@ def enrich_with_spro_paths(
                 query = f"{primary_kw} {mod} SPRO configuration"
                 hits, _ = search_kb(query, max_results=3)
                 if hits:
-                    detail = f"(via search — no dedicated config section)\n{hits[0]['excerpt']}"
-                    config_source = hits[0]["source"]
+                    detail = f"(via search — no dedicated config section)\n{hits[0]['snippet']}"
+                    config_source = hits[0]["file"]   # "file" key, not "source"
 
             step["spro_detail"] = detail
             step["spro_source"] = config_source if detail else None
