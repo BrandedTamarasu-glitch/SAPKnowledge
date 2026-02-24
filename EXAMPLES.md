@@ -1132,7 +1132,7 @@ else:
     print("  Integration section not found — falling back to search")
     hits, _ = search_kb("KO88 settlement FI document category 22", max_results=3)
     for h in hits:
-        print(f"  [{h['source']}] {h['heading']}: {h['excerpt'][:120]}")
+        print(f"  [{h['file']}] {h['heading']}: {h['snippet'][:120]}")
 
 print("\n" + "=" * 70)
 print("VALIDATION COMPLETE")
@@ -1931,6 +1931,63 @@ asyncio.run(get_patterns_with_spro_mcp())
 
 Constructs targeted KB queries from a failure description, chains MM and FI sources to diagnose the root cause, and returns a structured resolution guide. Demonstrates how to parse failure context (SAP message IDs, movement types, T-codes) into precise KB queries, with a three-file lookup chain and `search_kb` fallback for every step.
 
+**Setup:**
+```bash
+# Run from the SAPKnowledge/ repo root
+pip install pyyaml        # only external dependency
+python examples/example12.py
+```
+
+**Quick start — minimal working call:**
+```python
+import sys; sys.path.insert(0, "scripts")
+from example12 import diagnose_mm_account_determination, print_diagnosis
+
+# Classic F5 error — OBYC entry missing for BSX
+d = diagnose_mm_account_determination(
+    "MIGO fails: F5 error — account not defined for transaction key BSX, movement type 101"
+)
+print_diagnosis(d)
+
+# Access structured results directly
+print(d["symptom_label"])           # "OBYC missing entry"
+print(d["signals"]["movement_types"])   # ["101"]
+print(d["signals"]["transaction_keys"]) # ["BSX"]
+for key, info in d["transaction_key_info"].items():
+    print(key, "→", info["description"])
+```
+
+**KB files accessed** (via `_load_mm_sources()` — loaded once, reused across all queries):
+
+| Key | File | Contains |
+|-----|------|---------|
+| `mm_advanced` | `modules/mm/mm-advanced.md` | Symptom-first troubleshooting (10 entries), OBYC 5-step debugging path, valuation class setup chain |
+| `mm_integration` | `modules/mm/integration.md` | MM-FI integration catalog — which OBYC keys fire per movement type |
+| `fi_acct_det` | `modules/fi/account-determination.md` | Full OBYC transaction key reference (BSX, WRX, GBB, KON, PRD, AKO, INV, UMB) with account modifier table |
+
+**Helper function signatures** (from `scripts/kb_reader.py` — full contracts in Example 17b):
+
+| Function | Signature | Returns | On miss |
+|----------|-----------|---------|---------|
+| `parse_frontmatter` | `(filepath: Path)` | `(meta: dict, body: str)` | Raises `FileNotFoundError` |
+| `get_file_body` | `(template: str, module: str)` | `(body: str, source: str)` | `("", "not found")` — never raises |
+| `find_section_by_topic` | `(body: str, topic: str)` | `str \| None` | `None` if not found |
+| `extract_tcode_section` | `(body: str, tcode: str)` | `str \| None` | `None` if not found |
+| `search_kb` | `(query: str, max_results: int)` | `(hits: list[dict], total: int)` | `([], 0)` — never raises |
+
+`search_kb` hit dict keys: `"file"` (path), `"heading"`, `"snippet"`, `"score"`.
+
+**Function map:**
+
+| Function | Role |
+|----------|------|
+| `extract_failure_signals(description)` | Pure text parsing — extracts movement types, transaction keys, SAP message codes, T-codes, and symptom keyword. No KB access. |
+| `_load_mm_sources()` | Loads `mm-advanced.md`, `mm/integration.md`, `fi/account-determination.md`. Returns `{key: (body, source)}`. |
+| `query_kb_for_mm_acct_failure(signals, sources)` | Runs 6 targeted KB queries based on extracted signals. Returns `{query_name: (text\|None, source\|None)}`. |
+| `diagnose_mm_account_determination(description)` | Top-level: calls all three above, assembles structured diagnosis dict. |
+| `print_diagnosis(d)` | Display helper — formats the diagnosis dict as a human-readable report. |
+
+**Full implementation:**
 ```python
 import sys
 import re
@@ -2178,7 +2235,7 @@ def query_kb_for_mm_acct_failure(signals: dict, sources: dict) -> dict:
         hits, total = search_kb(query, max_results=5)
         if hits:
             fallback_text = "\n---\n".join(
-                f"[{h['source']}] {h['heading']}\n{h['excerpt']}" for h in hits
+                f"[{h['file']}] {h['heading']}\n{h['snippet']}" for h in hits
             )
             results["fallback_search"] = (
                 f"search_kb({repr(query)}) → {total}+ matches\n\n{fallback_text}",
@@ -2275,7 +2332,7 @@ def diagnose_mm_account_determination(
             diagnostic_tcodes[tcode] = usage_m.group(1).strip()[:200] if usage_m else section[:100]
         else:
             hits, _ = search_kb(f"{tcode} MM account determination simulation", max_results=1)
-            diagnostic_tcodes[tcode] = hits[0]["excerpt"][:150] if hits else f"{tcode} — not in KB"
+            diagnostic_tcodes[tcode] = hits[0]["snippet"][:150] if hits else f"{tcode} — not in KB"
 
     # Step 8: Assemble final diagnosis
     files_consulted = list({
